@@ -89,6 +89,11 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		return append(instructions, Instruction{
 			Code: OP_EQ,
 		}), nil
+	case parser.EXPR_KIND_ID:
+		return append(instructions, Instruction{
+			Code: OP_LOAD_VAR,
+			Arg1: expr.Token.Content,
+		}), nil
 	}
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
 }
@@ -113,6 +118,21 @@ func CompileStmt(stmt parser.Stmt) ([]Instruction, error) {
 	case parser.STMT_KIND_IMPLICIT_RETURN:
 		instructions, err := CompileExpr(stmt.Expr)
 		return instructions, err
+	case parser.STMT_KIND_VAR_DECLARATION:
+		instructions := []Instruction{}
+		_ = stmt.Data[0].Content
+		varName := stmt.Data[1].Content
+		compiled, err := CompileExpr(stmt.Expr)
+		instructions = append(instructions, compiled...)
+		instructions = append(instructions, Instruction{
+			Code: OP_STORE_VAR,
+			Arg1: varName,
+		})
+		instructions = append(instructions, Instruction{
+			Code: OP_POP_CONST,
+			Arg1: varName,
+		})
+		return instructions, err
 	default:
 		return []Instruction{}, fmt.Errorf("unable to compile statement [%s]", stmt.Kind)
 	}
@@ -130,6 +150,5 @@ func Compile(program *parser.Program) ([]Instruction, error) {
 	instructions = append(instructions, Instruction{
 		Code: OP_DEBUG_PRINT,
 	})
-
 	return instructions, nil
 }

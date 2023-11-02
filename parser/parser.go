@@ -27,6 +27,7 @@ type Program struct {
 }
 
 type Stmt struct {
+	Data []tokenizer.Token
 	Kind string
 	Expr Expr
 }

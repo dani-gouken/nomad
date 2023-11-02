@@ -13,6 +13,11 @@ const (
 type Vm struct {
 	fp    int
 	stack Stack
+	env   Environment
+}
+
+func (vm *Vm) Env() *Environment {
+	return &vm.env
 }
 
 type Instruction struct {
@@ -24,8 +29,9 @@ type Instruction struct {
 func New() *Vm {
 	return &Vm{
 		stack: Stack{
-			pointer: 0,
+			pointer: 1,
 		},
+		env: NewEnvironment(),
 	}
 }
 
@@ -62,11 +68,10 @@ loop:
 			v := instruction.Arg2
 			vm.pushConst(t, v)
 		case OP_DEBUG_PRINT:
-			value, err := vm.stack.Pop()
-			if err != nil {
-				return err
+			value, err := vm.stack.Current()
+			if err == nil {
+				fmt.Println(*value)
 			}
-			fmt.Println(*value)
 		case OP_NOT:
 			value, err := vm.stack.Pop()
 			if err != nil {
@@ -110,6 +115,27 @@ loop:
 			v2Int, _ := RuntimeValueAsInt(v2)
 
 			vm.stack.PushInt(v1Int.Value + v2Int.Value)
+		case OP_PUSH_SCOPE:
+			vm.Env().PushScope()
+		case OP_POP_SCOPE:
+			vm.Env().PopScope()
+		case OP_STORE_VAR:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			vm.Env().SetVariable(
+				instruction.Arg1,
+				value,
+			)
+		case OP_POP_CONST:
+			vm.stack.Pop()
+		case OP_LOAD_VAR:
+			value, err := vm.Env().GetVariable(instruction.Arg1)
+			if err != nil {
+				return err
+			}
+			vm.stack.Push(*value)
 		case OP_SUB:
 			v2, err := vm.stack.Pop()
 			if err != nil {
