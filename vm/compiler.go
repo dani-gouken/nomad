@@ -17,7 +17,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		instructions = append(instructions, compiled...)
 		return append(instructions, Instruction{
-			Code: OP_NOT,
+			Code:       OP_NOT,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_NEGATIVE:
 		compiled, err := CompileExpr(expr.Exprs[0])
@@ -26,7 +27,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		instructions = append(instructions, compiled...)
 		return append(instructions, Instruction{
-			Code: OP_NEGATIVE,
+			Code:       OP_NEGATIVE,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_CONSTANT:
 		t := expr.Token
@@ -34,25 +36,28 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		case tokenizer.TOKEN_KIND_TRUE:
 			return []Instruction{
 				{
-					Code: OP_STORE_CONST,
-					Arg1: VM_RUNTIME_BOOL,
-					Arg2: OP_CONST_TRUE,
+					Code:       OP_STORE_CONST,
+					Arg1:       BOOL_TYPE,
+					Arg2:       OP_CONST_TRUE,
+					DebugToken: expr.Token,
 				},
 			}, nil
 		case tokenizer.TOKEN_KIND_NUM_LIT:
 			return []Instruction{
 				{
-					Code: OP_STORE_CONST,
-					Arg1: VM_RUNTIME_INT,
-					Arg2: t.Content,
+					Code:       OP_STORE_CONST,
+					Arg1:       INT_TYPE,
+					Arg2:       t.Content,
+					DebugToken: expr.Token,
 				},
 			}, nil
 		case tokenizer.TOKEN_KIND_FALSE:
 			return []Instruction{
 				{
-					Code: OP_STORE_CONST,
-					Arg1: VM_RUNTIME_BOOL,
-					Arg2: OP_CONST_FALSE,
+					Code:       OP_STORE_CONST,
+					Arg1:       BOOL_TYPE,
+					Arg2:       OP_CONST_FALSE,
+					DebugToken: expr.Token,
 				},
 			}, nil
 
@@ -63,7 +68,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		return append(instructions, Instruction{
-			Code: OP_ADD,
+			Code:       OP_ADD,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_SUBSTRACTION:
 		instructions, err := CompileBinaryExpr(expr)
@@ -71,7 +77,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		return append(instructions, Instruction{
-			Code: OP_SUB,
+			Code:       OP_SUB,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_MULTIPLICATION:
 		instructions, err := CompileBinaryExpr(expr)
@@ -79,7 +86,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		return append(instructions, Instruction{
-			Code: OP_MULT,
+			Code:       OP_MULT,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_EQ:
 		instructions, err := CompileBinaryExpr(expr)
@@ -87,12 +95,14 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		return append(instructions, Instruction{
-			Code: OP_EQ,
+			Code:       OP_EQ,
+			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_ID:
 		return append(instructions, Instruction{
-			Code: OP_LOAD_VAR,
-			Arg1: expr.Token.Content,
+			Code:       OP_LOAD_VAR,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
 		}), nil
 	}
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
@@ -120,17 +130,20 @@ func CompileStmt(stmt parser.Stmt) ([]Instruction, error) {
 		return instructions, err
 	case parser.STMT_KIND_VAR_DECLARATION:
 		instructions := []Instruction{}
-		_ = stmt.Data[0].Content
+		varType := stmt.Data[0].Content
 		varName := stmt.Data[1].Content
 		compiled, err := CompileExpr(stmt.Expr)
 		instructions = append(instructions, compiled...)
 		instructions = append(instructions, Instruction{
-			Code: OP_STORE_VAR,
-			Arg1: varName,
+			Code:       OP_STORE_VAR,
+			Arg1:       varType,
+			Arg2:       varName,
+			DebugToken: stmt.Expr.Token,
 		})
 		instructions = append(instructions, Instruction{
-			Code: OP_POP_CONST,
-			Arg1: varName,
+			Code:       OP_POP_CONST,
+			Arg1:       varName,
+			DebugToken: stmt.Expr.Token,
 		})
 		return instructions, err
 	default:

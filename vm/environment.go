@@ -54,8 +54,11 @@ func (e *Environment) PopScope() error {
 	return nil
 }
 
-func (s *Scope) SetVariable(name string, value *RuntimeValue) {
-	s.variables[name] = value
+func (s *Scope) SetVariable(name string, varType *RuntimeType, value interface{}) {
+	s.variables[name] = &RuntimeValue{
+		TypeName: varType.name,
+		Value:    value,
+	}
 }
 
 func (s *Scope) UnsetVariable(name string) {
@@ -69,12 +72,15 @@ func (s *Scope) GetVariable(name string) (*RuntimeValue, error) {
 	}
 	return value, nil
 }
-func (e *Environment) SetVariable(name string, value *RuntimeValue) error {
+func (e *Environment) SetVariable(name string, declaredType *RuntimeType, constantValue *RuntimeValue) error {
 	scope, err := e.GetCurrentScope()
 	if err != nil {
 		return err
 	}
-	scope.SetVariable(name, value)
+	if declaredType.name != constantValue.TypeName {
+		return fmt.Errorf("type mismatch, could not assign value of type [%s(%v)] to the variable [%s(%s)]", constantValue.TypeName, constantValue.Value, name, declaredType.name)
+	}
+	scope.SetVariable(name, declaredType, constantValue.Value)
 	return nil
 }
 

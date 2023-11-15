@@ -37,19 +37,24 @@ func (s *Stack) Current() (*RuntimeValue, error) {
 }
 
 func (s *Stack) PushBool(value bool) error {
-	return s.Push(&BoolRuntimeValue{
-		Value: value,
+	return s.Push(RuntimeValue{
+		TypeName: BOOL_TYPE,
+		Value:    value,
 	})
 }
 func (s *Stack) PushInt(value int64) error {
-	return s.Push(&IntRuntimeValue{
-		Value: value,
+	return s.Push(RuntimeValue{
+		Value:    value,
+		TypeName: INT_TYPE,
+	})
+}
+func (s *Stack) PushFloat(value float64) error {
+	return s.Push(RuntimeValue{
+		Value:    value,
+		TypeName: FLOAT_TYPE,
 	})
 }
 
-func (s *Stack) GetBool(pointer int) (*BoolRuntimeValue, error) {
-	return RuntimeValueAsBool(s.Get(pointer))
-}
 func (s *Stack) Get(pointer int) *RuntimeValue {
 	return &s.data[pointer]
 }

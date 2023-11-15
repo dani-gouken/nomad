@@ -117,7 +117,7 @@ func (p *Parser) expectNext(kind string, pos int, expected string) error {
 	token, ok := p.peekAt(pos)
 	if !ok {
 		p, _ := p.peekAt(-1)
-		return fmt.Errorf("non-terminated statement, expected %s or New Line, got EOF at line %d", expected, p.Loc.Line)
+		return fmt.Errorf("non-terminated statement, expected %s or new Line, got EOF at line %d", expected, p.Loc.Line)
 	}
 	if token.Kind != kind {
 		return fmt.Errorf("unexpected token. expected %s, got %s: %s at  at position %d:%d:%d", expected, token.Kind, token.Content, token.Loc.Line, token.Loc.Start, token.Loc.End)
