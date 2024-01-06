@@ -54,11 +54,24 @@ func (e *Environment) PopScope() error {
 	return nil
 }
 
-func (s *Scope) SetVariable(name string, varType *RuntimeType, value interface{}) {
-	s.variables[name] = &RuntimeValue{
-		TypeName: varType.name,
-		Value:    value,
+func (s *Scope) DeclareVariable(name string, value interface{}, runtimeType *RuntimeType, declaredType *RuntimeType, possibleTypes []*RuntimeType) error {
+	runtimeTypeValid := false
+	possibleTypesName := []string{}
+	for i := 0; i < len(possibleTypes); i++ {
+		if !runtimeTypeValid && (possibleTypes[i].name == runtimeType.GetName()) {
+			runtimeTypeValid = true
+		}
+		possibleTypesName = append(possibleTypesName, possibleTypes[i].GetName())
 	}
+	if !runtimeTypeValid {
+		return fmt.Errorf("type mismatch, could not assign value of type %s to the variable %s declared as %s", runtimeType.GetName(), declaredType.name, name)
+	}
+	s.variables[name] = &RuntimeValue{
+		TypeName:      runtimeType.GetName(),
+		Value:         value,
+		PossibleTypes: possibleTypesName,
+	}
+	return nil
 }
 
 func (s *Scope) UnsetVariable(name string) {
@@ -72,16 +85,18 @@ func (s *Scope) GetVariable(name string) (*RuntimeValue, error) {
 	}
 	return value, nil
 }
-func (e *Environment) SetVariable(name string, declaredType *RuntimeType, constantValue *RuntimeValue) error {
+func (e *Environment) DeclareVariable(
+	name string,
+	runtimeType *RuntimeType,
+	runtimeValue *RuntimeValue,
+	declaredType *RuntimeType,
+	possibleTypes []*RuntimeType,
+) error {
 	scope, err := e.GetCurrentScope()
 	if err != nil {
 		return err
 	}
-	if declaredType.name != constantValue.TypeName {
-		return fmt.Errorf("type mismatch, could not assign value of type [%s(%v)] to the variable [%s(%s)]", constantValue.TypeName, constantValue.Value, name, declaredType.name)
-	}
-	scope.SetVariable(name, declaredType, constantValue.Value)
-	return nil
+	return scope.DeclareVariable(name, runtimeValue.Value, runtimeType, declaredType, possibleTypes)
 }
 
 func (e *Environment) UnsetVariable(name string) error {

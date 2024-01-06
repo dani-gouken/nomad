@@ -1,39 +1,26 @@
-Dog () {
-    import println from :io:stdout
+fun equation(int x, int y, int z): void {
+    float delta = x*x - 4 * a * c;
 
-    string name;
-    
-    func New() {
+    float s1 = (-y - math.sqrt(delta)) / 2 *a;
+    float s2 = (-y + math.sqrt(delta)) / 2 *a;
 
-    }
-
-    func<Dog> bark = () {
-        printn("ouaf")
-        return ::
-    }
-
-    func<bool> changeName = (string new_name) {
-        ::name = new_name;
-    }
+    print_ln("The solution 1 is: "+ s1);
+    print_ln("The solution 2 is: "+ s2);
 }
 
-Dog dog = Dog:new()
-Dog dog = Dog:new()
+type person = {
+    age: int,
+    name: string
+};
 
-func<float> equation =  () {
-    func print = :io:stdout:print_ln
-
-    print("Entrez a: \n")
-    float a = :float.from_string(readline())
-    print("Entrez b: \n")
-    float b = :float.from_string(readline())
-    print("Entrez c: \n")
-    float c = :int.from_string(readline())
-
-    int delta = :math.pow(b, 2) - (4*a*c)
-    if res < 0 {
-        print("Aucun résultat");
+impl stringable on person {
+    func to_string(self): string {
+        return self.name   
     }
-
 }
-equation()
+func main {
+    string name = io::std::readline_str();
+    person p = person { age: 10, name: "daniel" };
+
+    print_ln(person);
+}

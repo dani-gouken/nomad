@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dani-gouken/nomad/parser"
 	"github.com/dani-gouken/nomad/tokenizer"
@@ -43,10 +44,14 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 				},
 			}, nil
 		case tokenizer.TOKEN_KIND_NUM_LIT:
+			numType := INT_TYPE
+			if strings.Contains(t.Content, ".") {
+				numType = FLOAT_TYPE
+			}
 			return []Instruction{
 				{
 					Code:       OP_STORE_CONST,
-					Arg1:       INT_TYPE,
+					Arg1:       numType,
 					Arg2:       t.Content,
 					DebugToken: expr.Token,
 				},
@@ -69,6 +74,15 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		return append(instructions, Instruction{
 			Code:       OP_ADD,
+			DebugToken: expr.Token,
+		}), nil
+	case parser.EXPR_KIND_DIVISION:
+		instructions, err := CompileBinaryExpr(expr)
+		if err != nil {
+			return instructions, err
+		}
+		return append(instructions, Instruction{
+			Code:       OP_DIV,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_SUBSTRACTION:
@@ -127,6 +141,22 @@ func CompileStmt(stmt parser.Stmt) ([]Instruction, error) {
 	switch stmt.Kind {
 	case parser.STMT_KIND_IMPLICIT_RETURN:
 		instructions, err := CompileExpr(stmt.Expr)
+		return instructions, err
+	case parser.STMT_KIND_ASSIGNMENT:
+		instructions := []Instruction{}
+		varName := stmt.Data[0].Content
+		compiled, err := CompileExpr(stmt.Expr)
+		instructions = append(instructions, compiled...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_SET_VAR,
+			Arg1:       varName,
+			DebugToken: stmt.Expr.Token,
+		})
+		instructions = append(instructions, Instruction{
+			Code:       OP_POP_CONST,
+			Arg1:       varName,
+			DebugToken: stmt.Expr.Token,
+		})
 		return instructions, err
 	case parser.STMT_KIND_VAR_DECLARATION:
 		instructions := []Instruction{}

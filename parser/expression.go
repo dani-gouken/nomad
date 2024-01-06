@@ -61,6 +61,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, error) {
 				expr,
 			},
 		}, nil
+
 	case tokenizer.TOKEN_KIND_DB_MINUS:
 		p.consume()
 		expr, err := p.parseIdExpr()
@@ -98,7 +99,7 @@ func isBinaryOperatorToken(t tokenizer.Token) bool {
 }
 func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	switch t.Kind {
-	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL:
+	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH:
 		return OPERATOR_PRECEDENCE_REGULAR
 	case tokenizer.TOKEN_KIND_STAR:
 		return OPERATOR_PRECEDENCE_HIGH
@@ -120,6 +121,14 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, error) {
 	case tokenizer.TOKEN_KIND_MINUS:
 		return Expr{
 			Kind:  EXPR_KIND_SUBSTRACTION,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
+	case tokenizer.TOKEN_KIND_SLASH:
+		return Expr{
+			Kind:  EXPR_KIND_DIVISION,
 			Token: op,
 			Exprs: []Expr{
 				lhs, rhs,

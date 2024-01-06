@@ -14,6 +14,7 @@ type TOKEN_KIND = string
 const (
 	TOKEN_KIND_STRING_LIT    = "TOKEN_KIND_STRING_LIT"
 	TOKEN_KIND_NUM_LIT       = "TOKEN_KIND_NUM_LIT"
+	TOKEN_KIND_SLASH         = "TOKEN_KIND_SLASH"
 	TOKEN_KIND_COMMA         = "TOKEN_KIND_COMMA"
 	TOKEN_KIND_EQUAL         = "TOKEN_KIND_EQUAL"
 	TOKEN_KIND_ID            = "TOKEN_KIND_ID"
@@ -130,6 +131,17 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokens = append(tokens, Token{
 				Kind: TOKEN_KIND_STAR,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '/':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_SLASH,
 				Loc: TokenLoc{
 					Start: t.col,
 					End:   t.col,
@@ -254,6 +266,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 		case unicode.IsNumber(r):
 			number := c
 			t.consume()
+			hasDecimal := false
 			tokStart := t.col
 			for {
 				c, ok = t.peek()
@@ -261,8 +274,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 					break
 				}
 				r, _ = utf8.DecodeRuneInString(c)
-				if !unicode.IsNumber(r) {
+				isDecimalPoint := len(c) > 0 && !hasDecimal && r == '.'
+				if !unicode.IsNumber(r) && !isDecimalPoint {
 					break
+				}
+				if isDecimalPoint {
+					hasDecimal = true
 				}
 				number += c
 				t.consume()

@@ -116,9 +116,19 @@ loop:
 				floatValue := value.Value.(float64)
 				vm.stack.PushFloat(-floatValue)
 			default:
-				return RuntimeErrorUnsupportedOperand("Negative (-)", value.TypeName, instruction.DebugToken)
+				return RuntimeErrorUnsupportedOperand("negative (-)", value.TypeName, instruction.DebugToken)
 			}
-		case OP_ADD, OP_SUB, OP_EQ, OP_MULT:
+		case OP_EQ:
+			rhs, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			lhs, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			vm.stack.PushBool(rhs.Value == lhs.Value)
+		case OP_ADD, OP_SUB, OP_MULT, OP_DIV:
 			rhs, err := vm.stack.Pop()
 			if err != nil {
 				return err
@@ -131,6 +141,14 @@ loop:
 			if err != nil {
 				return err
 			}
+			t, err := vm.types.Get(lhs.TypeName)
+			if err != nil {
+				return RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			_, err = t.GetMethod(opSymbol)
+			if err != nil {
+				return RuntimeErrorUnsupportedOperand(opSymbol, t.name, instruction.DebugToken)
+			}
 			result, err := vm.CallMethod(lhs, opSymbol, instruction.DebugToken, rhs)
 			if err != nil {
 				return err
@@ -140,21 +158,61 @@ loop:
 			vm.Env().PushScope()
 		case OP_POP_SCOPE:
 			vm.Env().PopScope()
+		case OP_SET_VAR:
+			value, err := vm.stack.Pop()
+
+			if err != nil {
+				return RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			variableName := instruction.Arg1
+			variable, err := vm.env.GetVariable(variableName)
+			if err != nil {
+				return RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			err = vm.checkTypeCompatibility(variable.TypeName, value.TypeName)
+			if err != nil {
+				return RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			variable.Value = value.Value
+			variable.TypeName = value.TypeName
 		case OP_STORE_VAR:
 			value, err := vm.stack.Pop()
+
 			if err != nil {
 				return err
 			}
+
 			declaredTypeName := instruction.Arg1
 			declaredType, err := vm.types.Get(declaredTypeName)
+			possibleTypes := []*RuntimeType{}
+
+			if err != nil {
+				compositeType, err := vm.types.GetComposite(declaredTypeName)
+				if err != nil {
+					return RuntimeError(err.Error(), instruction.DebugToken)
+				}
+				for i := 0; i < len(compositeType.Cases); i++ {
+					t, err := vm.types.Get(compositeType.Cases[i])
+					if err != nil {
+						return RuntimeError(err.Error(), instruction.DebugToken)
+					}
+					possibleTypes = append(possibleTypes, t)
+				}
+			} else {
+				possibleTypes = append(possibleTypes, declaredType)
+			}
+
+			valueType, err := vm.types.Get(value.TypeName)
 			if err != nil {
 				return RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			name := instruction.Arg2
-			err = vm.Env().SetVariable(
+			err = vm.Env().DeclareVariable(
 				name,
-				declaredType,
+				valueType,
 				value,
+				declaredType,
+				possibleTypes,
 			)
 			if err != nil {
 				return RuntimeError(err.Error(), instruction.DebugToken)
@@ -169,7 +227,7 @@ loop:
 			vm.stack.Push(*value)
 
 		default:
-			return fmt.Errorf("runtime error: Failed to interpret instruction [%s]", instruction.Code)
+			return RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
 		}
 	}
 	return nil
@@ -182,11 +240,36 @@ func OpToSymbol(op string) (string, error) {
 		return "-", nil
 	case OP_MULT:
 		return "*", nil
-	case OP_EQ:
-		return "==", nil
+	case OP_DIV:
+		return "/", nil
 	}
 	return "", fmt.Errorf("unknown operator %s", op)
 
+}
+
+func (vm *Vm) checkTypeCompatibility(typeA string, typeB string) error {
+	possibleTypesA, err := vm.types.GetPossible(typeA)
+
+	if err != nil {
+		return err
+	}
+	possibleTypesB, err := vm.types.GetPossible(typeB)
+
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(possibleTypesA); i++ {
+		possibleA := possibleTypesA[i]
+		for j := 0; i < len(possibleTypesB); j++ {
+			possibleB := possibleTypesA[j]
+			if possibleA == possibleB {
+				return nil
+			}
+		}
+
+	}
+	return fmt.Errorf("type %s is not compatible with %s", typeA, typeB)
 }
 func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer.Token, parameters ...*RuntimeValue) (*RuntimeValue, error) {
 	t, err := vm.types.Get(self.TypeName)
@@ -210,10 +293,14 @@ func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer
 	if len(parameters) != (len(function.Signature) - 1) {
 		return nil, RuntimeError(fmt.Sprintf("invalid parameter when calling %s::%s, expected %d parameters got %d", self.TypeName, method, len(function.Signature), len(parameters)), debugToken)
 	}
+
 	for i := 0; i < len(function.Signature)-1; i++ {
-		parameter := function.Signature[i]
+
+		parameter := function.Signature[i+1]
 		value := parameters[i]
-		if parameter.TypeName != value.TypeName {
+		err := vm.checkTypeCompatibility(parameter.TypeName, value.TypeName)
+
+		if err != nil {
 			return nil, RuntimeError(fmt.Sprintf("type mismatch on %s::%s, expected parameter %d to be %s got %s", self.TypeName, method, i+1, parameter.TypeName, value.TypeName), debugToken)
 		}
 		callParameters = append(callParameters, ParameterValue{
@@ -221,5 +308,12 @@ func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer
 			Value:     value,
 		})
 	}
-	return function.Run(callParameters)
+	result, err := function.Run(callParameters)
+	if err != nil {
+		return nil, RuntimeError(err.Error(), debugToken)
+	}
+	if result.TypeName != function.ReturnTypeName {
+		return nil, RuntimeError(fmt.Sprintf("expected return type for %s::%s is %s got %s", self.TypeName, method, function.ReturnTypeName, result.TypeName), debugToken)
+	}
+	return result, err
 }

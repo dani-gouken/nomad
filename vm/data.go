@@ -18,6 +18,7 @@ type ParameterValue struct {
 }
 
 type RuntimeValue struct {
-	TypeName string
-	Value    interface{}
+	TypeName      string
+	Value         interface{}
+	PossibleTypes []string
 }

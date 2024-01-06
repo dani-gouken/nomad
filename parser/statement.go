@@ -9,6 +9,7 @@ import (
 const (
 	STMT_KIND_IMPLICIT_RETURN = "IMPLICIT_RETURN"
 	STMT_KIND_VAR_DECLARATION = "VARIABLE_DECLARATION"
+	STMT_KIND_ASSIGNMENT      = "ASSIGNMENT"
 )
 
 func (p *Parser) parseStmts() ([]Stmt, error) {
@@ -50,9 +51,37 @@ func (p *Parser) parseStmt() (Stmt, error) {
 	if err == nil {
 		return stmt, err
 	}
+	stmt, err = p.parseAssignment()
+	if err == nil {
+		return stmt, err
+	}
 	return p.parseImplicitReturnStmt()
 }
+func (p *Parser) parseAssignment() (Stmt, error) {
+	stmt := Stmt{}
+	err := p.expect(tokenizer.TOKEN_KIND_ID, "identifier (variable name)")
+	if err != nil {
+		return stmt, err
+	}
+	err = p.expectNext(tokenizer.TOKEN_KIND_EQUAL, 1, "equal (=)")
+	if err != nil {
+		return stmt, err
+	}
+	varName, _ := p.peek()
+	p.consume()
+	p.consume() // consume equal sign
 
+	value, err := p.parseExpr()
+
+	if err != nil {
+		return stmt, err
+	}
+	return Stmt{
+		Data: []tokenizer.Token{varName},
+		Kind: STMT_KIND_ASSIGNMENT,
+		Expr: value,
+	}, nil
+}
 func (p *Parser) parseVariableDeclaration() (Stmt, error) {
 	stmt := Stmt{}
 	err := p.expect(tokenizer.TOKEN_KIND_ID, "identifier (type)")
@@ -86,12 +115,12 @@ func (p *Parser) parseVariableDeclaration() (Stmt, error) {
 }
 
 func (p *Parser) terminateStmt() error {
-	err := p.expect(tokenizer.TOKEN_KIND_SEMI_COLON, "semi colon (;) OR New Line")
+	err := p.expect(tokenizer.TOKEN_KIND_SEMI_COLON, "semi colon (;) or new Line")
 	if err == nil {
 		p.consume()
 		return nil
 	}
-	err = p.expect(tokenizer.TOKEN_KIND_NEW_LINE, "semi colon (;) OR New Line")
+	err = p.expect(tokenizer.TOKEN_KIND_NEW_LINE, "semi colon (;) or new Line")
 	if err == nil {
 		p.consume()
 		return nil
@@ -106,10 +135,10 @@ func (p *Parser) expect(kind string, expected string) error {
 	token, ok := p.peek()
 	if !ok {
 		p, _ := p.peekAt(-1)
-		return fmt.Errorf("non-terminated statement, expected %s or New Line, got EOF at line %d", expected, p.Loc.Line)
+		return fmt.Errorf("non-terminated statement, expected %s or new line, got EOF at line %d", expected, p.Loc.Line)
 	}
 	if token.Kind != kind {
-		return fmt.Errorf("unexpected token. expected %s, got %s: %s at  at position %d:%d:%d", expected, token.Kind, token.Content, token.Loc.Line, token.Loc.Start, token.Loc.End)
+		return fmt.Errorf("unexpected token. expected %s, got %s: %s at position %d:%d:%d", expected, token.Kind, token.Content, token.Loc.Line, token.Loc.Start, token.Loc.End)
 	}
 	return nil
 }
