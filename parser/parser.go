@@ -1,6 +1,9 @@
 package parser
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
@@ -14,8 +17,11 @@ const (
 	EXPR_KIND_DIVISION       = "DIVISION"
 	EXPR_KIND_SUBSTRACTION   = "SUBSTRACTION"
 	EXPR_KIND_MULTIPLICATION = "MULTIPLICATION"
+	EXPR_KIND_LESS_THAN      = "LESS_THAN"
+	EXPR_KIND_MORE_THAN      = "MORE_THAN"
 	EXPR_KIND_EQ             = "EQUAL"
 	EXPR_KIND_ID             = "IDENTIFIER"
+	EXPR_KIND_LOOP           = "LOOP"
 )
 
 type Parser struct {
@@ -24,13 +30,14 @@ type Parser struct {
 }
 
 type Program struct {
-	Stmts []Stmt
+	Stmts []*Stmt
 }
 
 type Stmt struct {
-	Data []tokenizer.Token
-	Kind string
-	Expr Expr
+	Data     []tokenizer.Token
+	Kind     string
+	Expr     Expr
+	Children []*Stmt
 }
 
 type Expr struct {
@@ -79,6 +86,11 @@ func (p *Parser) peekAt(pos int) (tokenizer.Token, bool) {
 func (p *Parser) consume() {
 	p.cursor++
 }
+
+func (p *Parser) rollback(position int) {
+	p.cursor = position
+}
+
 func (p *Parser) spit() {
 	p.cursor--
 }
@@ -91,4 +103,30 @@ func (p *Parser) isEOF() bool {
 func Parse(tokens []tokenizer.Token) (*Program, error) {
 	p := NewParser(tokens)
 	return p.parse()
+}
+
+func DebugPrintParseTree(stmts []*Stmt, indentLevel int) {
+	for i := 0; i < len(stmts); i++ {
+		stmt := stmts[i]
+		fmt.Print(strings.Repeat(" ", indentLevel) + stmt.Kind)
+		fmt.Print(" ")
+		if stmt.Expr.Kind != "" {
+			fmt.Print(ExprToSExpr(stmt.Expr))
+			fmt.Print(" ")
+		}
+		if len(stmt.Data) > 0 {
+			fmt.Print("(")
+			for k := 0; k < len(stmt.Data); k++ {
+				fmt.Print(stmt.Data[k].Content)
+				if k < len(stmt.Data)-1 {
+					fmt.Print(" ")
+				}
+			}
+			fmt.Print(")")
+		}
+		fmt.Println()
+		if len(stmt.Children) > 0 {
+			DebugPrintParseTree(stmt.Children, indentLevel+1)
+		}
+	}
 }

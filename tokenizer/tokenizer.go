@@ -18,6 +18,10 @@ const (
 	TOKEN_KIND_COMMA         = "TOKEN_KIND_COMMA"
 	TOKEN_KIND_EQUAL         = "TOKEN_KIND_EQUAL"
 	TOKEN_KIND_ID            = "TOKEN_KIND_ID"
+	TOKEN_KIND_IF            = "TOKEN_KIND_IF"
+	TOKEN_KIND_ELSE          = "TOKEN_KIND_ELSE"
+	TOKEN_KIND_ELIF          = "TOKEN_KIND_ELIF"
+	TOKEN_KIND_FOR           = "TOKEN_KIND_FOR"
 	TOKEN_KIND_NEW_LINE      = "TOKEN_KIND_NEW_LINE"
 	TOKEN_KIND_BANG          = "TOKEN_KIND_BANG"
 	TOKEN_KIND_TRUE          = "TOKEN_KIND_TRUE"
@@ -29,8 +33,13 @@ const (
 	TOKEN_KIND_DB_MINUS      = "TOKEN_KIND_DB_MINUS"
 	TOKEN_KIND_SEMI_COLON    = "TOKEN_KIND_SEMI_COLON"
 	TOKEN_KIND_DB_EQUAL      = "TOKEN_KIND_DB_EQUAL"
+	TOKEN_KIND_INFERIOR_SIGN = "TOKEN_KIND_INFERIOR_SIGN"
+	TOKEN_KIND_SUPERIOR_SIGN = "TOKEN_KIND_SUPERIOR_SIGN"
 	TOKEN_KIND_LEFT_BRACKET  = "TOKEN_KIND_LEFT_BRACKET"
 	TOKEN_KIND_RIGHT_BRACKET = "TOKEN_KIND_RIGHT_BRACKET"
+	TOKEN_KIND_LEFT_CURCLY   = "TOKEN_KIND_LEFT_CURCLY"
+	TOKEN_KIND_RIGHT_CURLY   = "TOKEN_KIND_RIGHT_CURLY"
+	TOKEN_KIND_PRINT         = "TOKEN_KIND_PRINT"
 )
 
 type TokenLoc struct {
@@ -72,15 +81,15 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 		case r == '\n':
 			t.line++
 			t.consume()
-			tokens = append(tokens, Token{
-				Kind: TOKEN_KIND_NEW_LINE,
-				Loc: TokenLoc{
-					Start: t.col,
-					End:   t.col,
-					Line:  t.line,
-				},
-				Content: c,
-			})
+			// tokens = append(tokens, Token{
+			// 	Kind: TOKEN_KIND_NEW_LINE,
+			// 	Loc: TokenLoc{
+			// 		Start: t.col,
+			// 		End:   t.col,
+			// 		Line:  t.line,
+			// 	},
+			// 	Content: c,
+			// })
 			t.col = 0
 		// white space
 		case unicode.IsSpace(r):
@@ -138,6 +147,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				},
 				Content: c,
 			})
+		case r == '<':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_INFERIOR_SIGN,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '>':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_SUPERIOR_SIGN,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
 		case r == '/':
 			t.consume()
 			tokens = append(tokens, Token{
@@ -164,6 +195,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokens = append(tokens, Token{
 				Kind: TOKEN_KIND_LEFT_BRACKET,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '{':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_LEFT_CURCLY,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '}':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_RIGHT_CURLY,
 				Loc: TokenLoc{
 					Start: t.col,
 					End:   t.col,
@@ -317,6 +370,21 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			}
 			if strings.ToLower(id) == "false" {
 				kind = TOKEN_KIND_FALSE
+			}
+			if strings.ToLower(id) == "if" {
+				kind = TOKEN_KIND_IF
+			}
+			if strings.ToLower(id) == "else" {
+				kind = TOKEN_KIND_ELSE
+			}
+			if strings.ToLower(id) == "elif" {
+				kind = TOKEN_KIND_ELIF
+			}
+			if strings.ToLower(id) == "for" {
+				kind = TOKEN_KIND_FOR
+			}
+			if strings.ToLower(id) == "print" {
+				kind = TOKEN_KIND_PRINT
 			}
 
 			tokens = append(tokens, Token{

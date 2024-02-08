@@ -67,6 +67,35 @@ func MakeIntType() *RuntimeType {
 					}, nil
 				},
 			},
+			"<->": {
+				Signature: []Parameter{
+					{
+						Name:     "self",
+						TypeName: INT_TYPE,
+						Self:     true,
+					},
+					{
+						Name:     "b",
+						TypeName: NUM_TYPE,
+					},
+				},
+				ReturnTypeName: INT_TYPE,
+				Run: func(pv []ParameterValue) (*RuntimeValue, error) {
+					a, _ := ((pv[0]).Value.Value).(int64)
+					b, _ := ((pv[1]).Value.Value).(int64)
+					var result int64 = 0
+					if a < b {
+						result = -1
+					}
+					if a > b {
+						result = 1
+					}
+					return &RuntimeValue{
+						TypeName: INT_TYPE,
+						Value:    result,
+					}, nil
+				},
+			},
 			"/": {
 				Signature: []Parameter{
 					{
@@ -182,6 +211,35 @@ func MakeFloatType() *RuntimeType {
 					return &RuntimeValue{
 						TypeName: pv[0].Value.TypeName,
 						Value:    a - b,
+					}, nil
+				},
+			},
+			"<->": {
+				Signature: []Parameter{
+					{
+						Name:     "self",
+						TypeName: FLOAT_TYPE,
+						Self:     true,
+					},
+					{
+						Name:     "b",
+						TypeName: NUM_TYPE,
+					},
+				},
+				ReturnTypeName: INT_TYPE,
+				Run: func(pv []ParameterValue) (*RuntimeValue, error) {
+					a, _ := ((pv[0]).Value.Value).(float64)
+					b, _ := ((pv[1]).Value.Value).(float64)
+					var result int64 = 0
+					if a < b {
+						result = -1
+					}
+					if a > b {
+						result = 1
+					}
+					return &RuntimeValue{
+						TypeName: INT_TYPE,
+						Value:    result,
 					}, nil
 				},
 			},

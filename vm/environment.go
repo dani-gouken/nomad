@@ -64,7 +64,7 @@ func (s *Scope) DeclareVariable(name string, value interface{}, runtimeType *Run
 		possibleTypesName = append(possibleTypesName, possibleTypes[i].GetName())
 	}
 	if !runtimeTypeValid {
-		return fmt.Errorf("type mismatch, could not assign value of type %s to the variable %s declared as %s", runtimeType.GetName(), declaredType.name, name)
+		return fmt.Errorf("type mismatch, could not assign value of type %s to the variable %s declared as %s", runtimeType.GetName(), name, declaredType.name)
 	}
 	s.variables[name] = &RuntimeValue{
 		TypeName:      runtimeType.GetName(),

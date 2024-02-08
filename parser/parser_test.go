@@ -37,7 +37,7 @@ func TestParseNotExpr(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, ast, &parser.Program{
-		Stmts: []parser.Stmt{
+		Stmts: []*parser.Stmt{
 			{
 				Kind: parser.STMT_KIND_IMPLICIT_RETURN,
 				Expr: parser.Expr{
@@ -84,7 +84,7 @@ func TestParseNegativeExpr(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, ast, &parser.Program{
-		Stmts: []parser.Stmt{
+		Stmts: []*parser.Stmt{
 			{
 				Kind: parser.STMT_KIND_IMPLICIT_RETURN,
 				Expr: parser.Expr{
@@ -131,7 +131,7 @@ func TestParseIncrementExpr(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, &parser.Program{
-		Stmts: []parser.Stmt{
+		Stmts: []*parser.Stmt{
 			{
 				Kind: parser.STMT_KIND_IMPLICIT_RETURN,
 				Expr: parser.Expr{
@@ -178,7 +178,7 @@ func TestParseDecrementExpr(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, &parser.Program{
-		Stmts: []parser.Stmt{
+		Stmts: []*parser.Stmt{
 			{
 				Kind: parser.STMT_KIND_IMPLICIT_RETURN,
 				Expr: parser.Expr{
@@ -234,7 +234,7 @@ func TestParseAddition(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, ast, &parser.Program{
-		Stmts: []parser.Stmt{
+		Stmts: []*parser.Stmt{
 			{
 				Kind: parser.STMT_KIND_IMPLICIT_RETURN,
 				Expr: parser.Expr{

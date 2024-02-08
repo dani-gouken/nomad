@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 
+	nomadError "github.com/dani-gouken/nomad/errors"
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
@@ -15,7 +15,7 @@ const (
 	OPERATOR_PRECEDENCE_HIGHEST
 )
 
-func (p *Parser) parseExpr() (Expr, error) {
+func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
 	primaryExpr, err := p.parsePrimaryExpr()
 	if err != nil {
 		return primaryExpr, err
@@ -27,10 +27,10 @@ func (p *Parser) parseExpr() (Expr, error) {
 	return binaryExpr, err
 }
 
-func (p *Parser) parseUnaryOperatorExpr() (Expr, error) {
+func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 	t, ok := p.peek()
 	if !ok {
-		return Expr{}, fmt.Errorf("EOF")
+		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
 	}
 	switch t.Kind {
 	case tokenizer.TOKEN_KIND_BANG:
@@ -91,7 +91,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, error) {
 			},
 		}, nil
 	}
-	return Expr{}, errors.New("Parse error")
+	return Expr{}, nomadError.FatalParseError("failed to parse unary operator", t)
 }
 
 func isBinaryOperatorToken(t tokenizer.Token) bool {
@@ -99,7 +99,7 @@ func isBinaryOperatorToken(t tokenizer.Token) bool {
 }
 func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	switch t.Kind {
-	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH:
+	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH, tokenizer.TOKEN_KIND_INFERIOR_SIGN, tokenizer.TOKEN_KIND_SUPERIOR_SIGN:
 		return OPERATOR_PRECEDENCE_REGULAR
 	case tokenizer.TOKEN_KIND_STAR:
 		return OPERATOR_PRECEDENCE_HIGH
@@ -108,7 +108,7 @@ func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	}
 }
 
-func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, error) {
+func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadError.ParseError) {
 	switch op.Kind {
 	case tokenizer.TOKEN_KIND_PLUS:
 		return Expr{
@@ -142,6 +142,22 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, error) {
 				lhs, rhs,
 			},
 		}, nil
+	case tokenizer.TOKEN_KIND_INFERIOR_SIGN:
+		return Expr{
+			Kind:  EXPR_KIND_LESS_THAN,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
+	case tokenizer.TOKEN_KIND_SUPERIOR_SIGN:
+		return Expr{
+			Kind:  EXPR_KIND_MORE_THAN,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
 	case tokenizer.TOKEN_KIND_DB_EQUAL:
 		return Expr{
 			Kind:  EXPR_KIND_EQ,
@@ -151,20 +167,20 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, error) {
 			},
 		}, nil
 	}
-	return Expr{}, fmt.Errorf("expected binary operator, found %s", op.Kind)
+	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected binary operator, found %s", op.Kind), op)
 }
 
-func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, error) {
+func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *nomadError.ParseError) {
 	lookahead, ok := p.peek()
 	if !ok {
-		return Expr{}, fmt.Errorf("EOF")
+		return Expr{}, nomadError.FatalParseError("EOF", lhs.Token)
 	}
 	for isBinaryOperatorToken(lookahead) && getBinaryOperatorPrecedence(lookahead) >= minPrecedence {
 		op := lookahead
 		p.consume()
 		rhs, err := p.parsePrimaryExpr()
 		if err != nil {
-			return Expr{}, fmt.Errorf("failed to parse operator %s. %s at position %d:%d:%d", op.Kind, op.Content, op.Loc.Line, op.Loc.Start, op.Loc.End)
+			return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s", op.Kind), op)
 		}
 		lookahead, ok = p.peek()
 		if !ok {
@@ -174,7 +190,7 @@ func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, er
 		for isBinaryOperatorToken(lookahead) && getBinaryOperatorPrecedence(lookahead) > opPrecedence {
 			rhs, err = p.parseBinaryOperatorExpr(rhs, opPrecedence+1)
 			if err != nil {
-				return Expr{}, fmt.Errorf("failed to parse operator %s. %s at position %d:%d:%d", lookahead.Kind, lookahead.Content, lookahead.Loc.Line, lookahead.Loc.Start, lookahead.Loc.End)
+				return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s", lookahead.Kind), lookahead)
 			}
 			lookahead, ok = p.peek()
 			if !ok {
@@ -190,10 +206,10 @@ func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, er
 	return lhs, nil
 }
 
-func (p *Parser) parseConstantExpr() (Expr, error) {
+func (p *Parser) parseConstantExpr() (Expr, *nomadError.ParseError) {
 	t, ok := p.peek()
 	if !ok {
-		return Expr{}, fmt.Errorf("EOF")
+		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
 	}
 	switch t.Kind {
 	case tokenizer.TOKEN_KIND_NUM_LIT, tokenizer.TOKEN_KIND_TRUE, tokenizer.TOKEN_KIND_FALSE, tokenizer.TOKEN_KIND_STRING_LIT:
@@ -203,13 +219,13 @@ func (p *Parser) parseConstantExpr() (Expr, error) {
 			Token: t,
 		}, nil
 	}
-	return Expr{}, fmt.Errorf("could not parse constant")
+	return Expr{}, nomadError.FatalParseError("could not parse constant", t)
 }
 
-func (p *Parser) parseIdExpr() (Expr, error) {
+func (p *Parser) parseIdExpr() (Expr, *nomadError.ParseError) {
 	t, ok := p.peek()
 	if !ok {
-		return Expr{}, fmt.Errorf("EOF")
+		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
 	}
 	switch t.Kind {
 	case tokenizer.TOKEN_KIND_ID:
@@ -219,16 +235,16 @@ func (p *Parser) parseIdExpr() (Expr, error) {
 			Token: t,
 		}, nil
 	}
-	return Expr{}, fmt.Errorf("expected token identifier, %s: %s at position %d:%d:%d", t.Kind, t.Content, t.Loc.Line, t.Loc.Start, t.Loc.End)
+	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected token identifier, %s: %s", t.Kind, t.Content), t)
 }
 
-func (p *Parser) parseBracketExpr() (Expr, error) {
+func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
 	t, ok := p.peek()
 	if !ok {
-		return Expr{}, fmt.Errorf("EOF")
+		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
 	}
 	if t.Kind != tokenizer.TOKEN_KIND_LEFT_BRACKET {
-		return Expr{}, fmt.Errorf("expected opening bracket")
+		return Expr{}, nomadError.FatalParseError("expected opening bracket", t)
 	}
 	p.consume()
 	expr, err := p.parseExpr()
@@ -237,17 +253,17 @@ func (p *Parser) parseBracketExpr() (Expr, error) {
 	}
 	t, ok = p.peek()
 	if !ok {
-		return Expr{}, errors.New("expected closing bracket, got EOF")
+		return Expr{}, nomadError.FatalParseError("expected opening bracket, got EOF", t)
 	}
 
 	if t.Kind != tokenizer.TOKEN_KIND_RIGHT_BRACKET {
-		return Expr{}, fmt.Errorf("expected closing bracket, got %s", t.Kind)
+		return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected closing bracket, got %s", t.Kind), t)
 	}
 	p.consume()
 	return expr, nil
 }
 
-func (p *Parser) parsePrimaryExpr() (Expr, error) {
+func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 	expr, err := p.parseConstantExpr()
 	if err == nil {
 		return expr, err
@@ -267,9 +283,9 @@ func (p *Parser) parsePrimaryExpr() (Expr, error) {
 	token, ok := p.peek()
 	if !ok {
 		token, _ := p.peekAt(-1)
-		return Expr{}, fmt.Errorf("failed to parse expression. unexpected end of file after token %s: %s at position %d:%d:%d", token.Kind, token.Content, token.Loc.Line, token.Loc.Start, token.Loc.End)
+		return Expr{}, nomadError.FatalParseError(fmt.Sprintf("unexpected end of file after token %s", token.Kind), token)
 	}
-	return Expr{}, fmt.Errorf("%s. Failed to parse token %s: %s at position %d:%d:%d", err.Error(), token.Kind, token.Content, token.Loc.Line, token.Loc.Start, token.Loc.End)
+	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse expression: %s", token.Kind), token)
 }
 
 func ExprToSExpr(expr Expr) string {

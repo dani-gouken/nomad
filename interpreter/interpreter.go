@@ -17,10 +17,12 @@ func (p *Interpreter) Interpret(code string, instance *vm.Vm) error {
 		return err
 	}
 	program, err := parser.Parse(tokens)
+	//parser.DebugPrintParseTree(program.Stmts, 0)
 	if err != nil {
 		return err
 	}
-	opCode, err := vm.Compile(program)
+	opCode, err := vm.Compile(program.Stmts)
+	// vm.DebugPrintOpCode(opCode)
 	if err != nil {
 		return err
 	}

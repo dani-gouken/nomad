@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	nomadError "github.com/dani-gouken/nomad/errors"
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
@@ -67,7 +68,7 @@ func (vm *Vm) pushConst(runtimeType string, value string) error {
 		})
 
 	default:
-		return fmt.Errorf("runtime error: Unable to store value of runtime type %s", runtimeType)
+		return fmt.Errorf("runtime error: unable to store value of runtime type %s", runtimeType)
 	}
 }
 
@@ -75,10 +76,11 @@ func (vm *Vm) Interpret(instructions []Instruction) error {
 loop:
 	for i := 0; i < len(instructions); i++ {
 		instruction := instructions[i]
+		// fmt.Println(fmt.Sprintf("executing %s %s %s", instruction.Code, instruction.Arg1, instruction.Arg2))
 		switch instruction.Code {
 		case OP_HALT:
 			break loop
-		case OP_STORE_CONST:
+		case OP_PUSH_CONST:
 			t := instruction.Arg1
 			v := instruction.Arg2
 			err := vm.pushConst(t, v)
@@ -96,13 +98,39 @@ loop:
 				return err
 			}
 			if value.TypeName != BOOL_TYPE {
-				return RuntimeErrorUnsupportedOperand("not(!)", value.TypeName, instruction.DebugToken)
+				return nomadError.RuntimeErrorUnsupportedOperand("not(!)", value.TypeName, instruction.DebugToken)
 			}
 			boolValue := value.Value.(bool)
 			if err != nil {
 				return err
 			}
 			vm.stack.PushBool(!boolValue)
+		case JUMP:
+			addr, err := strconv.Atoi(instruction.Arg1)
+			if err != nil {
+				panic(err)
+			}
+			i = addr - 1
+		case JUMP_NOT, JUMP_IF:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			if value.TypeName != BOOL_TYPE {
+				return nomadError.RuntimeErrorUnsupportedOperand("boolean expected for comparison", value.TypeName, instruction.DebugToken)
+			}
+			v, ok := value.Value.(bool)
+			if !ok {
+				panic("boolean expected")
+			}
+			addr, err := strconv.Atoi(instruction.Arg1)
+			if err != nil {
+				panic(err)
+			}
+			if (instruction.Code == JUMP && v) || (instruction.Code == JUMP_NOT && !v) {
+				i = addr - 1
+			}
+
 		case OP_NEGATIVE:
 			value, err := vm.stack.Pop()
 			if err != nil {
@@ -116,7 +144,7 @@ loop:
 				floatValue := value.Value.(float64)
 				vm.stack.PushFloat(-floatValue)
 			default:
-				return RuntimeErrorUnsupportedOperand("negative (-)", value.TypeName, instruction.DebugToken)
+				return nomadError.RuntimeErrorUnsupportedOperand("negative (-)", value.TypeName, instruction.DebugToken)
 			}
 		case OP_EQ:
 			rhs, err := vm.stack.Pop()
@@ -128,7 +156,7 @@ loop:
 				return err
 			}
 			vm.stack.PushBool(rhs.Value == lhs.Value)
-		case OP_ADD, OP_SUB, OP_MULT, OP_DIV:
+		case OP_ADD, OP_SUB, OP_MULT, OP_DIV, OP_CMP:
 			rhs, err := vm.stack.Pop()
 			if err != nil {
 				return err
@@ -143,11 +171,11 @@ loop:
 			}
 			t, err := vm.types.Get(lhs.TypeName)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			_, err = t.GetMethod(opSymbol)
 			if err != nil {
-				return RuntimeErrorUnsupportedOperand(opSymbol, t.name, instruction.DebugToken)
+				return nomadError.RuntimeErrorUnsupportedOperand(opSymbol, t.name, instruction.DebugToken)
 			}
 			result, err := vm.CallMethod(lhs, opSymbol, instruction.DebugToken, rhs)
 			if err != nil {
@@ -156,26 +184,28 @@ loop:
 			vm.stack.Push(*result)
 		case OP_PUSH_SCOPE:
 			vm.Env().PushScope()
+		case OP_LABEL:
+			continue
 		case OP_POP_SCOPE:
 			vm.Env().PopScope()
 		case OP_SET_VAR:
 			value, err := vm.stack.Pop()
 
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			variableName := instruction.Arg1
 			variable, err := vm.env.GetVariable(variableName)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			err = vm.checkTypeCompatibility(variable.TypeName, value.TypeName)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			variable.Value = value.Value
 			variable.TypeName = value.TypeName
-		case OP_STORE_VAR:
+		case OP_DECL_VAR:
 			value, err := vm.stack.Pop()
 
 			if err != nil {
@@ -189,12 +219,12 @@ loop:
 			if err != nil {
 				compositeType, err := vm.types.GetComposite(declaredTypeName)
 				if err != nil {
-					return RuntimeError(err.Error(), instruction.DebugToken)
+					return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 				}
 				for i := 0; i < len(compositeType.Cases); i++ {
 					t, err := vm.types.Get(compositeType.Cases[i])
 					if err != nil {
-						return RuntimeError(err.Error(), instruction.DebugToken)
+						return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 					}
 					possibleTypes = append(possibleTypes, t)
 				}
@@ -204,7 +234,7 @@ loop:
 
 			valueType, err := vm.types.Get(value.TypeName)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			name := instruction.Arg2
 			err = vm.Env().DeclareVariable(
@@ -215,19 +245,19 @@ loop:
 				possibleTypes,
 			)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 		case OP_POP_CONST:
 			vm.stack.Pop()
 		case OP_LOAD_VAR:
 			value, err := vm.Env().GetVariable(instruction.Arg1)
 			if err != nil {
-				return RuntimeError(err.Error(), instruction.DebugToken)
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			vm.stack.Push(*value)
 
 		default:
-			return RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
+			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
 		}
 	}
 	return nil
@@ -240,6 +270,8 @@ func OpToSymbol(op string) (string, error) {
 		return "-", nil
 	case OP_MULT:
 		return "*", nil
+	case OP_CMP:
+		return "<->", nil
 	case OP_DIV:
 		return "/", nil
 	}
@@ -254,15 +286,14 @@ func (vm *Vm) checkTypeCompatibility(typeA string, typeB string) error {
 		return err
 	}
 	possibleTypesB, err := vm.types.GetPossible(typeB)
-
 	if err != nil {
 		return err
 	}
 
 	for i := 0; i < len(possibleTypesA); i++ {
 		possibleA := possibleTypesA[i]
-		for j := 0; i < len(possibleTypesB); j++ {
-			possibleB := possibleTypesA[j]
+		for j := 0; j < len(possibleTypesB); j++ {
+			possibleB := possibleTypesB[j]
 			if possibleA == possibleB {
 				return nil
 			}
@@ -274,11 +305,11 @@ func (vm *Vm) checkTypeCompatibility(typeA string, typeB string) error {
 func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer.Token, parameters ...*RuntimeValue) (*RuntimeValue, error) {
 	t, err := vm.types.Get(self.TypeName)
 	if err != nil {
-		return nil, RuntimeError(err.Error(), debugToken)
+		return nil, nomadError.RuntimeError(err.Error(), debugToken)
 	}
 	function, err := t.GetMethod(method)
 	if err != nil {
-		return nil, RuntimeError(err.Error(), debugToken)
+		return nil, nomadError.RuntimeError(err.Error(), debugToken)
 	}
 	callParameters := []ParameterValue{
 		{
@@ -291,7 +322,7 @@ func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer
 		},
 	}
 	if len(parameters) != (len(function.Signature) - 1) {
-		return nil, RuntimeError(fmt.Sprintf("invalid parameter when calling %s::%s, expected %d parameters got %d", self.TypeName, method, len(function.Signature), len(parameters)), debugToken)
+		return nil, nomadError.RuntimeError(fmt.Sprintf("invalid parameter when calling %s::%s, expected %d parameters got %d", self.TypeName, method, len(function.Signature), len(parameters)), debugToken)
 	}
 
 	for i := 0; i < len(function.Signature)-1; i++ {
@@ -301,7 +332,7 @@ func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer
 		err := vm.checkTypeCompatibility(parameter.TypeName, value.TypeName)
 
 		if err != nil {
-			return nil, RuntimeError(fmt.Sprintf("type mismatch on %s::%s, expected parameter %d to be %s got %s", self.TypeName, method, i+1, parameter.TypeName, value.TypeName), debugToken)
+			return nil, nomadError.RuntimeError(fmt.Sprintf("type mismatch on %s::%s, expected parameter %d to be %s got %s", self.TypeName, method, i+1, parameter.TypeName, value.TypeName), debugToken)
 		}
 		callParameters = append(callParameters, ParameterValue{
 			Parameter: parameter,
@@ -310,10 +341,10 @@ func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer
 	}
 	result, err := function.Run(callParameters)
 	if err != nil {
-		return nil, RuntimeError(err.Error(), debugToken)
+		return nil, nomadError.RuntimeError(err.Error(), debugToken)
 	}
 	if result.TypeName != function.ReturnTypeName {
-		return nil, RuntimeError(fmt.Sprintf("expected return type for %s::%s is %s got %s", self.TypeName, method, function.ReturnTypeName, result.TypeName), debugToken)
+		return nil, nomadError.RuntimeError(fmt.Sprintf("expected return type for %s::%s is %s got %s", self.TypeName, method, function.ReturnTypeName, result.TypeName), debugToken)
 	}
 	return result, err
 }
