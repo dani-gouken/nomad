@@ -1,23 +1,27 @@
 package main
 
 import (
+	"os"
+
 	"github.com/dani-gouken/nomad/interpreter"
 	"github.com/dani-gouken/nomad/vm"
 )
 
 func main() {
 
-	// i,🚀 = 60,9;
-	// printf "The result is: \"%s\"", i+🚀
-	source := `
-	for int i = 0; i < 10; i = i+1 {
-		print i
+	if len(os.Args) < 2 {
+		panic("source file is needed")
 	}
-	`
+	sourceFile := os.Args[1]
+	bytes, err := os.ReadFile(sourceFile)
+	if err != nil {
+		panic(err)
+	}
+
 	instance := vm.New()
 
 	interpreter := interpreter.NewInterpreter()
-	err := interpreter.Interpret(source, instance)
+	err = interpreter.Interpret(string(bytes), instance)
 	if err != nil {
 		println(err.Error())
 	}

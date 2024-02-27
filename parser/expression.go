@@ -20,11 +20,7 @@ func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
 	if err != nil {
 		return primaryExpr, err
 	}
-	binaryExpr, err := p.parseBinaryOperatorExpr(primaryExpr, OPERATOR_PRECEDENCE_MINIMUM)
-	if err != nil {
-		return primaryExpr, nil
-	}
-	return binaryExpr, err
+	return p.parseBinaryOperatorExpr(primaryExpr, OPERATOR_PRECEDENCE_MINIMUM)
 }
 
 func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
@@ -90,6 +86,34 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 				expr,
 			},
 		}, nil
+	case tokenizer.TOKEN_KIND_ID:
+		op, ok := p.peekAt(1)
+		if !ok {
+			break
+		}
+		var exprKind string
+		if op.Kind == tokenizer.TOKEN_KIND_DB_PLUS {
+			exprKind = EXPR_KIND_RIGHT_INCREMENT
+		}
+		if op.Kind == tokenizer.TOKEN_KIND_DB_MINUS {
+			exprKind = EXPR_KIND_RIGHT_DECREMENT
+		}
+		if exprKind == "" {
+			break
+		}
+		expr, err := p.parseIdExpr()
+		if err != nil {
+			p.spit()
+			return expr, err
+		}
+		p.consume()
+		return Expr{
+			Kind:  exprKind,
+			Token: t,
+			Exprs: []Expr{
+				expr,
+			},
+		}, nil
 	}
 	return Expr{}, nomadError.FatalParseError("failed to parse unary operator", t)
 }
@@ -99,7 +123,7 @@ func isBinaryOperatorToken(t tokenizer.Token) bool {
 }
 func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	switch t.Kind {
-	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH, tokenizer.TOKEN_KIND_INFERIOR_SIGN, tokenizer.TOKEN_KIND_SUPERIOR_SIGN:
+	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH, tokenizer.TOKEN_KIND_INFERIOR_SIGN, tokenizer.TOKEN_KIND_SUPERIOR_SIGN, tokenizer.TOKEN_KIND_AND, tokenizer.TOKEN_KIND_BAR:
 		return OPERATOR_PRECEDENCE_REGULAR
 	case tokenizer.TOKEN_KIND_STAR:
 		return OPERATOR_PRECEDENCE_HIGH
@@ -166,8 +190,24 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 				lhs, rhs,
 			},
 		}, nil
+	case tokenizer.TOKEN_KIND_AND:
+		return Expr{
+			Kind:  EXPR_KIND_AND,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
+	case tokenizer.TOKEN_KIND_BAR:
+		return Expr{
+			Kind:  EXPR_KIND_OR,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
 	}
-	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected binary operator, found %s", op.Kind), op)
+	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("unknown binary operator %s", op.Kind), op)
 }
 
 func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *nomadError.ParseError) {
@@ -264,7 +304,12 @@ func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
 }
 
 func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
+
 	expr, err := p.parseConstantExpr()
+	if err == nil {
+		return expr, err
+	}
+	expr, err = p.parseUnaryOperatorExpr()
 	if err == nil {
 		return expr, err
 	}
@@ -276,10 +321,7 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 	if err == nil {
 		return expr, err
 	}
-	expr, err = p.parseUnaryOperatorExpr()
-	if err == nil {
-		return expr, err
-	}
+
 	token, ok := p.peek()
 	if !ok {
 		token, _ := p.peekAt(-1)

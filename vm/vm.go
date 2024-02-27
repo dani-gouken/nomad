@@ -182,6 +182,34 @@ loop:
 				return err
 			}
 			vm.stack.Push(*result)
+		case OP_OR, OP_AND:
+			rhs, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			lhs, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			opSymbol, err := OpToSymbol(instruction.Code)
+			if err != nil {
+				return err
+			}
+			if lhs.TypeName != BOOL_TYPE {
+				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, lhs.TypeName), instruction.DebugToken)
+			}
+			if rhs.TypeName != BOOL_TYPE {
+				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, rhs.TypeName), instruction.DebugToken)
+			}
+			lhsValue := lhs.Value.(bool)
+			rhsValue := rhs.Value.(bool)
+			var res bool
+			if instruction.Code == OP_OR {
+				res = lhsValue || rhsValue
+			} else {
+				res = lhsValue && rhsValue
+			}
+			vm.stack.PushBool(res)
 		case OP_PUSH_SCOPE:
 			vm.Env().PushScope()
 		case OP_LABEL:
@@ -272,6 +300,10 @@ func OpToSymbol(op string) (string, error) {
 		return "*", nil
 	case OP_CMP:
 		return "<->", nil
+	case OP_AND:
+		return "&", nil
+	case OP_OR:
+		return "|", nil
 	case OP_DIV:
 		return "/", nil
 	}

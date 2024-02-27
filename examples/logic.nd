@@ -1,0 +1,10 @@
+print true & false
+print true & true
+print true | false
+
+bool vrai = true
+bool faux = true
+
+print vrai | faux 
+
+print (true | false ) & ( false & true )

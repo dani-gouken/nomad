@@ -9,5 +9,4 @@ if true {
 	double = number * 2;
 	number = 0 - 3;
 }
-print true;
 print double;

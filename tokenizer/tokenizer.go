@@ -29,6 +29,8 @@ const (
 	TOKEN_KIND_MINUS         = "TOKEN_KIND_MINUS"
 	TOKEN_KIND_PLUS          = "TOKEN_KIND_PLUS"
 	TOKEN_KIND_STAR          = "TOKEN_KIND_STAR"
+	TOKEN_KIND_BAR           = "TOKEN_KIND_BAR"
+	TOKEN_KIND_AND           = "TOKEN_KIND_AND"
 	TOKEN_KIND_DB_PLUS       = "TOKEN_KIND_DB_PLUS"
 	TOKEN_KIND_DB_MINUS      = "TOKEN_KIND_DB_MINUS"
 	TOKEN_KIND_SEMI_COLON    = "TOKEN_KIND_SEMI_COLON"
@@ -195,6 +197,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokens = append(tokens, Token{
 				Kind: TOKEN_KIND_LEFT_BRACKET,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '|':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_BAR,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '&':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_AND,
 				Loc: TokenLoc{
 					Start: t.col,
 					End:   t.col,

@@ -1,0 +1,22 @@
+struct Person {
+    string name = ""
+    string surname = ""
+    int age = 0
+
+    func full_name() {
+        return name + " " + surname
+    }
+}
+
+func is_major(Person person): string {
+    if person.age > 18 then return 'Major'
+    else return 'Minor' 
+}
+
+Person daniel = new Person {
+    name = "Daniel"
+    surname = "Steph"
+}
+
+print daniel.full_name
+print is_major(daniel)

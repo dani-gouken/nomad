@@ -84,6 +84,24 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Code:       OP_ADD,
 			DebugToken: expr.Token,
 		}), nil
+	case parser.EXPR_KIND_AND:
+		instructions, err := CompileBinaryExpr(expr)
+		if err != nil {
+			return instructions, err
+		}
+		return append(instructions, Instruction{
+			Code:       OP_AND,
+			DebugToken: expr.Token,
+		}), nil
+	case parser.EXPR_KIND_OR:
+		instructions, err := CompileBinaryExpr(expr)
+		if err != nil {
+			return instructions, err
+		}
+		return append(instructions, Instruction{
+			Code:       OP_OR,
+			DebugToken: expr.Token,
+		}), nil
 	case parser.EXPR_KIND_DIVISION:
 		instructions, err := CompileBinaryExpr(expr)
 		if err != nil {
@@ -137,6 +155,31 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		instructions = append(instructions, Instruction{
 			Code:       OP_EQ,
+			DebugToken: expr.Token,
+		})
+		return instructions, err
+	case parser.EXPR_KIND_RIGHT_INCREMENT, parser.EXPR_KIND_RIGHT_DECREMENT:
+		instructions, err := CompileExpr(expr.Exprs[0])
+		if err != nil {
+			return instructions, err
+		}
+		op := OP_ADD
+		if expr.Kind == parser.EXPR_KIND_RIGHT_DECREMENT {
+			op = OP_SUB
+		}
+		instructions = append(instructions, Instruction{
+			Code:       OP_PUSH_CONST,
+			DebugToken: expr.Token,
+			Arg1:       INT_TYPE,
+			Arg2:       "1",
+		})
+		instructions = append(instructions, Instruction{
+			Code:       op,
+			DebugToken: expr.Token,
+		})
+		instructions = append(instructions, Instruction{
+			Code:       OP_SET_VAR,
+			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
 		return instructions, err

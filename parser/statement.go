@@ -167,7 +167,7 @@ func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		return nil, err
 	}
-	err = p.expectF(tokenizer.TOKEN_KIND_SEMI_COLON, "separator (;)")
+	err = p.expectF(tokenizer.TOKEN_KIND_SEMI_COLON, "end of statement")
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +264,7 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		return []*Stmt{}, err
 	}
-	err = p.expectNextF(tokenizer.TOKEN_KIND_ID, 1, "identifier (variable name)")
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_ID, 1, "identifier (variable name)")
 	if err != nil {
 		return []*Stmt{}, err
 	}

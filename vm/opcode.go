@@ -12,6 +12,8 @@ const (
 	OP_PUSH_SCOPE   = "PUSH_SCOPE"
 	OP_POP_SCOPE    = "POP_SCOPE"
 	OP_NOT          = "NOT"
+	OP_OR           = "OR"
+	OP_AND          = "AND"
 	OP_NEGATIVE     = "OP_NEGATIVE"
 	OP_STORE_GLOBAL = "STORE_GLOBAL"
 	OP_DECL_VAR     = "DECL_VAR"
