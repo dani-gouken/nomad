@@ -156,6 +156,20 @@ loop:
 				return err
 			}
 			vm.stack.PushBool(rhs.Value == lhs.Value)
+		case OP_EQ_2:
+			rhs, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			lhs1, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			lhs2, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			vm.stack.PushBool((rhs.Value == lhs1.Value) || (rhs.Value == lhs2.Value))
 		case OP_ADD, OP_SUB, OP_MULT, OP_DIV, OP_CMP:
 			rhs, err := vm.stack.Pop()
 			if err != nil {

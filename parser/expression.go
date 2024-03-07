@@ -123,7 +123,16 @@ func isBinaryOperatorToken(t tokenizer.Token) bool {
 }
 func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	switch t.Kind {
-	case tokenizer.TOKEN_KIND_PLUS, tokenizer.TOKEN_KIND_MINUS, tokenizer.TOKEN_KIND_DB_EQUAL, tokenizer.TOKEN_KIND_SLASH, tokenizer.TOKEN_KIND_INFERIOR_SIGN, tokenizer.TOKEN_KIND_SUPERIOR_SIGN, tokenizer.TOKEN_KIND_AND, tokenizer.TOKEN_KIND_BAR:
+	case tokenizer.TOKEN_KIND_PLUS,
+		tokenizer.TOKEN_KIND_MINUS,
+		tokenizer.TOKEN_KIND_EQUAL,
+		tokenizer.TOKEN_KIND_SLASH,
+		tokenizer.TOKEN_KIND_INFERIOR_SIGN,
+		tokenizer.TOKEN_KIND_INFERIOR_OR_EQ_SIGN,
+		tokenizer.TOKEN_KIND_SUPERIOR_SIGN,
+		tokenizer.TOKEN_KIND_SUPERIOR_OR_EQ_SIGN,
+		tokenizer.TOKEN_KIND_AND,
+		tokenizer.TOKEN_KIND_BAR:
 		return OPERATOR_PRECEDENCE_REGULAR
 	case tokenizer.TOKEN_KIND_STAR:
 		return OPERATOR_PRECEDENCE_HIGH
@@ -182,7 +191,23 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 				lhs, rhs,
 			},
 		}, nil
-	case tokenizer.TOKEN_KIND_DB_EQUAL:
+	case tokenizer.TOKEN_KIND_INFERIOR_OR_EQ_SIGN:
+		return Expr{
+			Kind:  EXPR_LESS_THAN_OR_EQ,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
+	case tokenizer.TOKEN_KIND_SUPERIOR_OR_EQ_SIGN:
+		return Expr{
+			Kind:  EXPR_KIND_MORE_THAN_OR_EQ,
+			Token: op,
+			Exprs: []Expr{
+				lhs, rhs,
+			},
+		}, nil
+	case tokenizer.TOKEN_KIND_EQUAL:
 		return Expr{
 			Kind:  EXPR_KIND_EQ,
 			Token: op,
@@ -213,7 +238,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *nomadError.ParseError) {
 	lookahead, ok := p.peek()
 	if !ok {
-		return Expr{}, nomadError.FatalParseError("EOF", lhs.Token)
+		return Expr{}, nomadError.NonFatalParseError("EOF", lhs.Token)
 	}
 	for isBinaryOperatorToken(lookahead) && getBinaryOperatorPrecedence(lookahead) >= minPrecedence {
 		op := lookahead

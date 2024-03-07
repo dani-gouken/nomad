@@ -158,6 +158,33 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		})
 		return instructions, err
+	case parser.EXPR_KIND_MORE_THAN_OR_EQ, parser.EXPR_LESS_THAN_OR_EQ:
+		expected := "1"
+		if expr.Kind == parser.EXPR_LESS_THAN_OR_EQ {
+			expected = "-1"
+		}
+		instructions = append(instructions, Instruction{
+			Code:       OP_PUSH_CONST,
+			DebugToken: expr.Token,
+			Arg1:       INT_TYPE,
+			Arg2:       expected,
+		})
+		instructions = append(instructions, Instruction{
+			Code:       OP_PUSH_CONST,
+			DebugToken: expr.Token,
+			Arg1:       INT_TYPE,
+			Arg2:       "0",
+		})
+		exprInstructions, err := CompileComp(expr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, exprInstructions...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_EQ_2,
+			DebugToken: expr.Token,
+		})
+		return instructions, err
 	case parser.EXPR_KIND_RIGHT_INCREMENT, parser.EXPR_KIND_RIGHT_DECREMENT:
 		instructions, err := CompileExpr(expr.Exprs[0])
 		if err != nil {

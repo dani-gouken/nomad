@@ -1,0 +1,15 @@
+int app_port = 8080
+
+HttpServer app :: {
+    port :: app_port
+}
+
+app.get "/ping" , (_): Response |
+    Response { content :: 'OK' }
+
+Error err :: app.listen()
+
+if Some(err) {
+    print "Failed to start server on port " + app_port.to_string()
+    exit 1
+}

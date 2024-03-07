@@ -12,36 +12,42 @@ import (
 type TOKEN_KIND = string
 
 const (
-	TOKEN_KIND_STRING_LIT    = "TOKEN_KIND_STRING_LIT"
-	TOKEN_KIND_NUM_LIT       = "TOKEN_KIND_NUM_LIT"
-	TOKEN_KIND_SLASH         = "TOKEN_KIND_SLASH"
-	TOKEN_KIND_COMMA         = "TOKEN_KIND_COMMA"
-	TOKEN_KIND_EQUAL         = "TOKEN_KIND_EQUAL"
-	TOKEN_KIND_ID            = "TOKEN_KIND_ID"
-	TOKEN_KIND_IF            = "TOKEN_KIND_IF"
-	TOKEN_KIND_ELSE          = "TOKEN_KIND_ELSE"
-	TOKEN_KIND_ELIF          = "TOKEN_KIND_ELIF"
-	TOKEN_KIND_FOR           = "TOKEN_KIND_FOR"
-	TOKEN_KIND_NEW_LINE      = "TOKEN_KIND_NEW_LINE"
-	TOKEN_KIND_BANG          = "TOKEN_KIND_BANG"
-	TOKEN_KIND_TRUE          = "TOKEN_KIND_TRUE"
-	TOKEN_KIND_FALSE         = "TOKEN_KIND_FALSE"
-	TOKEN_KIND_MINUS         = "TOKEN_KIND_MINUS"
-	TOKEN_KIND_PLUS          = "TOKEN_KIND_PLUS"
-	TOKEN_KIND_STAR          = "TOKEN_KIND_STAR"
-	TOKEN_KIND_BAR           = "TOKEN_KIND_BAR"
-	TOKEN_KIND_AND           = "TOKEN_KIND_AND"
-	TOKEN_KIND_DB_PLUS       = "TOKEN_KIND_DB_PLUS"
-	TOKEN_KIND_DB_MINUS      = "TOKEN_KIND_DB_MINUS"
-	TOKEN_KIND_SEMI_COLON    = "TOKEN_KIND_SEMI_COLON"
-	TOKEN_KIND_DB_EQUAL      = "TOKEN_KIND_DB_EQUAL"
-	TOKEN_KIND_INFERIOR_SIGN = "TOKEN_KIND_INFERIOR_SIGN"
-	TOKEN_KIND_SUPERIOR_SIGN = "TOKEN_KIND_SUPERIOR_SIGN"
-	TOKEN_KIND_LEFT_BRACKET  = "TOKEN_KIND_LEFT_BRACKET"
-	TOKEN_KIND_RIGHT_BRACKET = "TOKEN_KIND_RIGHT_BRACKET"
-	TOKEN_KIND_LEFT_CURCLY   = "TOKEN_KIND_LEFT_CURCLY"
-	TOKEN_KIND_RIGHT_CURLY   = "TOKEN_KIND_RIGHT_CURLY"
-	TOKEN_KIND_PRINT         = "TOKEN_KIND_PRINT"
+	TOKEN_KIND_STRING_LIT           = "TOKEN_KIND_STRING_LIT"
+	TOKEN_KIND_NUM_LIT              = "TOKEN_KIND_NUM_LIT"
+	TOKEN_KIND_SLASH                = "TOKEN_KIND_SLASH"
+	TOKEN_KIND_COMMA                = "TOKEN_KIND_COMMA"
+	TOKEN_KIND_EQUAL                = "TOKEN_KIND_EQUAL"
+	TOKEN_KIND_ID                   = "TOKEN_KIND_ID"
+	TOKEN_KIND_IF                   = "TOKEN_KIND_IF"
+	TOKEN_KIND_ELSE                 = "TOKEN_KIND_ELSE"
+	TOKEN_KIND_ELIF                 = "TOKEN_KIND_ELIF"
+	TOKEN_KIND_FOR                  = "TOKEN_KIND_FOR"
+	TOKEN_KIND_NEW_LINE             = "TOKEN_KIND_NEW_LINE"
+	TOKEN_KIND_BANG                 = "TOKEN_KIND_BANG"
+	TOKEN_KIND_TRUE                 = "TOKEN_KIND_TRUE"
+	TOKEN_KIND_FALSE                = "TOKEN_KIND_FALSE"
+	TOKEN_KIND_MINUS                = "TOKEN_KIND_MINUS"
+	TOKEN_KIND_PLUS                 = "TOKEN_KIND_PLUS"
+	TOKEN_KIND_STAR                 = "TOKEN_KIND_STAR"
+	TOKEN_KIND_BAR                  = "TOKEN_KIND_BAR"
+	TOKEN_KIND_AND                  = "TOKEN_KIND_AND"
+	TOKEN_KIND_DB_PLUS              = "TOKEN_KIND_DB_PLUS"
+	TOKEN_KIND_DB_MINUS             = "TOKEN_KIND_DB_MINUS"
+	TOKEN_KIND_SEMI_COLON           = "TOKEN_KIND_SEMI_COLON"
+	TOKEN_KIND_DB_COLON             = "TOKEN_KIND_DB_COLON"
+	TOKEN_KIND_COLON                = "TOKEN_KIND_COLON"
+	TOKEN_KIND_DB_EQUAL             = "TOKEN_KIND_DB_EQUAL"
+	TOKEN_KIND_INFERIOR_SIGN        = "TOKEN_KIND_INFERIOR_SIGN"
+	TOKEN_KIND_INFERIOR_OR_EQ_SIGN  = "TOKEN_KIND_INFERIOR_OR_EQ_SIGN"
+	TOKEN_KIND_SUPERIOR_SIGN        = "TOKEN_KIND_SUPERIOR_SIGN"
+	TOKEN_KIND_SUPERIOR_OR_EQ_SIGN  = "TOKEN_KIND_SUPERIOR_OR_EQ_SIGN"
+	TOKEN_KIND_LEFT_BRACKET         = "TOKEN_KIND_LEFT_BRACKET"
+	TOKEN_KIND_RIGHT_BRACKET        = "TOKEN_KIND_RIGHT_BRACKET"
+	TOKEN_KIND_LEFT_SQUARE_BRACKET  = "TOKEN_KIND_LEFT_SQUARE_BRACKET"
+	TOKEN_KIND_RIGHT_SQUARE_BRACKET = "TOKEN_KIND_RIGHT_SQUARE_BRACKET"
+	TOKEN_KIND_LEFT_CURCLY          = "TOKEN_KIND_LEFT_CURCLY"
+	TOKEN_KIND_RIGHT_CURLY          = "TOKEN_KIND_RIGHT_CURLY"
+	TOKEN_KIND_PRINT                = "TOKEN_KIND_PRINT"
 )
 
 type TokenLoc struct {
@@ -117,6 +123,27 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				},
 				Content: c,
 			})
+		case r == ':':
+			t.consume()
+			start := t.col
+			end := t.col
+			next, ok := t.peek()
+			kind := TOKEN_KIND_COLON
+			if ok && next == ":" {
+				t.consume()
+				end = t.col
+				c += next
+				kind = TOKEN_KIND_DB_COLON
+			}
+			tokens = append(tokens, Token{
+				Kind: kind,
+				Loc: TokenLoc{
+					Start: start,
+					End:   end,
+					Line:  t.line,
+				},
+				Content: c,
+			})
 		case r == '=':
 			t.consume()
 			start := t.col
@@ -151,22 +178,42 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			})
 		case r == '<':
 			t.consume()
+			start := t.col
+			end := t.col
+			next, ok := t.peek()
+			kind := TOKEN_KIND_INFERIOR_SIGN
+			if ok && next == "=" {
+				t.consume()
+				end = t.col
+				c += next
+				kind = TOKEN_KIND_INFERIOR_OR_EQ_SIGN
+			}
 			tokens = append(tokens, Token{
-				Kind: TOKEN_KIND_INFERIOR_SIGN,
+				Kind: kind,
 				Loc: TokenLoc{
-					Start: t.col,
-					End:   t.col,
+					Start: start,
+					End:   end,
 					Line:  t.line,
 				},
 				Content: c,
 			})
 		case r == '>':
 			t.consume()
+			start := t.col
+			end := t.col
+			next, ok := t.peek()
+			kind := TOKEN_KIND_SUPERIOR_SIGN
+			if ok && next == "=" {
+				t.consume()
+				end = t.col
+				c += next
+				kind = TOKEN_KIND_SUPERIOR_OR_EQ_SIGN
+			}
 			tokens = append(tokens, Token{
-				Kind: TOKEN_KIND_SUPERIOR_SIGN,
+				Kind: kind,
 				Loc: TokenLoc{
-					Start: t.col,
-					End:   t.col,
+					Start: start,
+					End:   end,
 					Line:  t.line,
 				},
 				Content: c,
@@ -252,6 +299,28 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokens = append(tokens, Token{
 				Kind: TOKEN_KIND_RIGHT_BRACKET,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == ']':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_RIGHT_SQUARE_BRACKET,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '[':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_LEFT_SQUARE_BRACKET,
 				Loc: TokenLoc{
 					Start: t.col,
 					End:   t.col,

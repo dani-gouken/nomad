@@ -75,7 +75,15 @@ func (p *Parser) parseStmt() ([]*Stmt, *nomadError.ParseError) {
 			return stmt, err
 		}
 	}
-	return p.parseImplicitReturnStmt()
+	stmt, err := p.parseImplicitReturnStmt()
+
+	if err == nil {
+		return stmt, nil
+	}
+	if err.ShouldCrash() {
+		return stmt, err
+	}
+	return []*Stmt{}, nil
 }
 func (p *Parser) parseBlock() ([]*Stmt, *nomadError.ParseError) {
 	stmts := []*Stmt{}
@@ -150,7 +158,6 @@ func (p *Parser) parseFlowControlStatement(tokenKind string, statementKind strin
 }
 
 func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
-	token, _ := p.peek()
 	err := p.expectNF(tokenizer.TOKEN_KIND_FOR, "for (keyword)")
 	if err != nil {
 		return nil, err
@@ -172,7 +179,7 @@ func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
 		return nil, err
 	}
 	p.consume()
-	token, _ = p.peek()
+	token, _ := p.peek()
 	iterStmt, err := p.parseAssignment()
 	if err != nil {
 		iterStmt, err = p.parseImplicitReturnStmt()
@@ -236,7 +243,7 @@ func (p *Parser) parseAssignment() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		return stmts, err
 	}
-	err = p.expectNextNF(tokenizer.TOKEN_KIND_EQUAL, 1, "equal (=)")
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_DB_COLON, 1, "double colon (::)")
 	if err != nil {
 		return stmts, err
 	}
@@ -268,7 +275,7 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		return []*Stmt{}, err
 	}
-	err = p.expectNextF(tokenizer.TOKEN_KIND_EQUAL, 2, "equal (=)")
+	err = p.expectNextF(tokenizer.TOKEN_KIND_DB_COLON, 2, "double colon (::)")
 	if err != nil {
 		return []*Stmt{}, err
 	}

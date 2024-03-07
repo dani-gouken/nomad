@@ -20,6 +20,7 @@ const (
 	OP_SET_VAR      = "SET_VAR"
 	OP_MULT         = "MULT"
 	OP_EQ           = "EQ"
+	OP_EQ_2         = "EQ_2"
 	OP_CMP          = "CMP"
 	OP_ADD          = "ADD"
 	OP_DIV          = "DIV"
