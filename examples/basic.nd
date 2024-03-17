@@ -1,15 +1,12 @@
 struct Person {
-    string name :: ""
-    string surname :: ""
-    int age :: 0
+    string  name        :: ""
+    string  surname     :: ""
+    int     age         :: 0
 
-    func full_name :: () string {
-        return name + " " + surname;
-    }
+    func    full_name   :: () string | name + " " + surname
 }
 
-func is_major :: (Person person) string |
-    if person.age > 18 then 'Major' else 'Minor' 
+func is_major :: (Person person) string | if person.age > 18 then 'Major' else 'Minor' 
 
 
 Person daniel = {
@@ -17,7 +14,7 @@ Person daniel = {
     surname :: "Steph"
 }
 
-print daniel.full_name
+print daniel.full_name()
 print is_major(daniel)
 
 bool correct :: is_major(daniel) & age < 10

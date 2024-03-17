@@ -2,6 +2,9 @@ package vm
 
 import (
 	"fmt"
+
+	nomadError "github.com/dani-gouken/nomad/errors"
+	"github.com/dani-gouken/nomad/tokenizer"
 )
 
 type TypeRegistrar struct {
@@ -9,11 +12,11 @@ type TypeRegistrar struct {
 	compositeTypes map[string]*CompositeType
 }
 
-func (r *TypeRegistrar) Add(t *RuntimeType) error {
-	if r.Has(t.GetName()) {
-		return fmt.Errorf("cannot redeclare type  %s", t.GetName())
+func (r *TypeRegistrar) Add(name string, t *RuntimeType, token tokenizer.Token) error {
+	if r.Has(name) {
+		return nomadError.RuntimeError(fmt.Sprintf("cannot redeclare type %s", name), token)
 	}
-	r.data[t.GetName()] = t
+	r.data[name] = t
 	return nil
 }
 
@@ -74,9 +77,11 @@ func NewTypeRegistrar() TypeRegistrar {
 		compositeTypes: make(map[string]*CompositeType),
 	}
 
-	r.Add(MakeIntType())
-	r.Add(MakeBoolype())
-	r.Add(MakeFloatType())
+	r.Add(INT_TYPE, MakeIntType(), tokenizer.Token{})
+	r.Add(BOOL_TYPE, MakeBoolType(), tokenizer.Token{})
+	r.Add(FLOAT_TYPE, MakeFloatType(), tokenizer.Token{})
+	r.Add(TYPE_TYPE, MakeTypeType(), tokenizer.Token{})
+	r.Add(ARRAY_TYPE, MakeArrayType(), tokenizer.Token{})
 
 	num := NewCompositeType(NUM_TYPE, INT_TYPE, FLOAT_TYPE)
 	r.AddCompositeType(&num)

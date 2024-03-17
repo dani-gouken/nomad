@@ -216,6 +216,30 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		}), nil
+	case parser.EXPR_KIND_TYPE:
+		return append(instructions, Instruction{
+			Code:       OP_LOAD_TYPE,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		}), nil
+	case parser.EXPR_KIND_ARRAY:
+		instructions = append(instructions, Instruction{
+			Code:       OP_ARR_INIT,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
+		for i := 0; i < len(expr.Exprs); i++ {
+			exprInstructions, err := CompileExpr(expr.Exprs[i])
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, exprInstructions...)
+			instructions = append(instructions, Instruction{
+				Code:       OP_ARR_PUSH,
+				DebugToken: expr.Exprs[i].Token,
+			})
+		}
+		return instructions, nil
 	}
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
 }
@@ -299,7 +323,7 @@ func (c *Compiler) CompileStmt() error {
 				}
 				c.instructions = append(c.instructions, ifConditionInstructions...)
 				c.instructions = append(c.instructions, Instruction{
-					Code: JUMP_NOT,
+					Code: OP_JUMP_NOT,
 					Arg1: nextLabel,
 				})
 			}
@@ -309,7 +333,7 @@ func (c *Compiler) CompileStmt() error {
 			}
 			c.instructions = append(c.instructions, branchStmts...)
 			c.instructions = append(c.instructions, Instruction{
-				Code: JUMP,
+				Code: OP_JUMP,
 				Arg1: exitIfLabel,
 			})
 			label = nextLabel
@@ -341,7 +365,7 @@ func (c *Compiler) CompileStmt() error {
 			Code: OP_EQ,
 		})
 		c.instructions = append(c.instructions, Instruction{
-			Code: JUMP_NOT,
+			Code: OP_JUMP_NOT,
 			Arg1: endForLabel,
 		})
 		forOperationsInstructions, err := CompileChunk(stmt.Children)
@@ -350,7 +374,7 @@ func (c *Compiler) CompileStmt() error {
 		}
 		c.instructions = append(c.instructions, forOperationsInstructions...)
 		c.instructions = append(c.instructions, Instruction{
-			Code: JUMP,
+			Code: OP_JUMP,
 			Arg1: forTestLabel,
 		})
 		c.instructions = append(c.instructions, Instruction{
@@ -378,6 +402,20 @@ func (c *Compiler) CompileStmt() error {
 		c.instructions = append(c.instructions, compiled...)
 		c.instructions = append(c.instructions, Instruction{
 			Code: OP_DEBUG_PRINT,
+		})
+		c.consume()
+		return err
+	case parser.STMT_KIND_TYPE_DECLARATION:
+		typeName := stmt.Data[0].Content
+		compiled, err := CompileExpr(stmt.Expr)
+		if err != nil {
+			return err
+		}
+		c.instructions = append(c.instructions, compiled...)
+		c.instructions = append(c.instructions, Instruction{
+			Code:       OP_DECL_TYPE,
+			Arg1:       typeName,
+			DebugToken: stmt.Expr.Token,
 		})
 		c.consume()
 		return err
@@ -425,7 +463,7 @@ func RemoveLabels(instructions []Instruction) ([]Instruction, error) {
 	}
 	for i := 0; i < len(instructions); i++ {
 		instruction := &instructions[i]
-		if instruction.Code == JUMP || instruction.Code == JUMP_NOT {
+		if instruction.Code == OP_JUMP || instruction.Code == OP_JUMP_NOT {
 			instruction.Arg1 = strconv.Itoa(labels[instruction.Arg1])
 		}
 	}

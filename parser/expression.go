@@ -236,16 +236,15 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 }
 
 func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *nomadError.ParseError) {
-	lookahead, ok := p.peek()
-	if !ok {
-		return Expr{}, nomadError.NonFatalParseError("EOF", lhs.Token)
-	}
+	lookahead, _ := p.peek()
+	var ok bool
 	for isBinaryOperatorToken(lookahead) && getBinaryOperatorPrecedence(lookahead) >= minPrecedence {
 		op := lookahead
 		p.consume()
 		rhs, err := p.parsePrimaryExpr()
+
 		if err != nil {
-			return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s", op.Kind), op)
+			return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s: %s", op.Kind, err.Error()), op)
 		}
 		lookahead, ok = p.peek()
 		if !ok {
@@ -255,7 +254,7 @@ func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *n
 		for isBinaryOperatorToken(lookahead) && getBinaryOperatorPrecedence(lookahead) > opPrecedence {
 			rhs, err = p.parseBinaryOperatorExpr(rhs, opPrecedence+1)
 			if err != nil {
-				return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s", lookahead.Kind), lookahead)
+				return Expr{}, nomadError.FatalParseError(fmt.Sprintf("failed to parse operator %s: %s", lookahead.Kind, err.Error()), lookahead)
 			}
 			lookahead, ok = p.peek()
 			if !ok {
@@ -272,10 +271,7 @@ func (p *Parser) parseBinaryOperatorExpr(lhs Expr, minPrecedence uint) (Expr, *n
 }
 
 func (p *Parser) parseConstantExpr() (Expr, *nomadError.ParseError) {
-	t, ok := p.peek()
-	if !ok {
-		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
-	}
+	t, _ := p.peek()
 	switch t.Kind {
 	case tokenizer.TOKEN_KIND_NUM_LIT, tokenizer.TOKEN_KIND_TRUE, tokenizer.TOKEN_KIND_FALSE, tokenizer.TOKEN_KIND_STRING_LIT:
 		p.consume()
@@ -304,10 +300,7 @@ func (p *Parser) parseIdExpr() (Expr, *nomadError.ParseError) {
 }
 
 func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
-	t, ok := p.peek()
-	if !ok {
-		return Expr{}, nomadError.FatalParseError("EOF", tokenizer.Token{})
-	}
+	t, _ := p.peek()
 	if t.Kind != tokenizer.TOKEN_KIND_LEFT_BRACKET {
 		return Expr{}, nomadError.FatalParseError("expected opening bracket", t)
 	}
@@ -316,7 +309,7 @@ func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
 	if err != nil {
 		return expr, err
 	}
-	t, ok = p.peek()
+	t, ok := p.peek()
 	if !ok {
 		return Expr{}, nomadError.FatalParseError("expected opening bracket, got EOF", t)
 	}
@@ -326,6 +319,70 @@ func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
 	}
 	p.consume()
 	return expr, nil
+}
+func (p *Parser) parseArrayExpr() (Expr, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening bracket ([)")
+	if err != nil {
+		return Expr{}, err
+	}
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_ID, 1, "identifier (type)")
+	if err != nil {
+		return Expr{}, err
+	}
+	err = p.expectNextF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, 2, "closing bracket (])")
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+	arrType, _ := p.peek()
+	p.consume()
+	p.consume()
+	err = p.expectF(tokenizer.TOKEN_KIND_LEFT_CURCLY, "opening bracket ({)")
+
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+	items, err := p.parseExprList(tokenizer.TOKEN_KIND_RIGHT_CURLY)
+	if err != nil {
+		return Expr{}, err
+	}
+	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_CURLY, "opening bracket (})")
+	p.consume()
+	if err != nil {
+		return Expr{}, err
+	}
+	return Expr{
+		Kind:  EXPR_KIND_ARRAY,
+		Token: arrType,
+		Exprs: items,
+	}, nil
+
+}
+
+func (p *Parser) parseExprList(endTokenKind string) ([]Expr, *nomadError.ParseError) {
+	list := []Expr{}
+
+	for {
+		token, _ := p.peek()
+
+		if token.Kind == endTokenKind {
+			return list, nil
+		}
+
+		expr, err := p.parseExpr()
+
+		if err != nil {
+			return list, err
+		}
+
+		list = append(list, expr)
+		token, _ = p.peek()
+
+		if token.Kind == tokenizer.TOKEN_KIND_COMMA {
+			p.consume()
+		}
+	}
 }
 
 func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
@@ -338,10 +395,16 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 	if err == nil {
 		return expr, err
 	}
-	expr, err = p.parseIdExpr()
+	expr, err = p.parseArrayExpr()
 	if err == nil {
 		return expr, err
 	}
+	expr, err = p.parseIdExpr()
+
+	if err == nil {
+		return expr, err
+	}
+
 	expr, err = p.parseBracketExpr()
 	if err == nil {
 		return expr, err

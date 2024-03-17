@@ -8,15 +8,16 @@ import (
 )
 
 const (
-	STMT_KIND_IMPLICIT_RETURN = "IMPLICIT_RETURN"
-	STMT_KIND_VAR_DECLARATION = "VARIABLE_DECLARATION"
-	STMT_KIND_IF              = "IF"
-	STMT_KIND_DEBUG_PRINT     = "DEBUG_PRINT"
-	STMT_KIND_ELSE            = "ELSE"
-	STMT_KIND_FOR             = "FOR"
-	STMT_KIND_ELIF            = "ELIF"
-	STMT_KIND_SCOPE           = "SCOPE"
-	STMT_KIND_ASSIGNMENT      = "ASSIGNMENT"
+	STMT_KIND_IMPLICIT_RETURN  = "IMPLICIT_RETURN"
+	STMT_KIND_VAR_DECLARATION  = "VARIABLE_DECLARATION"
+	STMT_KIND_TYPE_DECLARATION = "TYPE_DECLARATION"
+	STMT_KIND_IF               = "IF"
+	STMT_KIND_DEBUG_PRINT      = "DEBUG_PRINT"
+	STMT_KIND_ELSE             = "ELSE"
+	STMT_KIND_FOR              = "FOR"
+	STMT_KIND_ELIF             = "ELIF"
+	STMT_KIND_SCOPE            = "SCOPE"
+	STMT_KIND_ASSIGNMENT       = "ASSIGNMENT"
 )
 
 func (p *Parser) parseStmts() ([]*Stmt, *nomadError.ParseError) {
@@ -59,6 +60,7 @@ func (p *Parser) parseStmt() ([]*Stmt, *nomadError.ParseError) {
 	parseFuncs := []func() ([]*Stmt, *nomadError.ParseError){
 		p.parseAssignment,
 		p.parsePrint,
+		p.parseTypeDeclaration,
 		p.parseVariableDeclaration,
 		p.parseIfStatement,
 		p.parseForLoop,
@@ -293,6 +295,40 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	stmt := Stmt{
 		Data: []tokenizer.Token{varType, varName},
 		Kind: STMT_KIND_VAR_DECLARATION,
+		Expr: value,
+	}
+
+	p.terminateStmt(stmt)
+
+	return []*Stmt{&stmt}, nil
+}
+
+func (p *Parser) parseTypeDeclaration() ([]*Stmt, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_TYPE, "keyword (type)")
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_ID, 1, "identifier (type name)")
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	err = p.expectNextF(tokenizer.TOKEN_KIND_DB_COLON, 2, "double colon (::)")
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	p.consume()
+	typeName, _ := p.peek()
+	p.consume()
+	p.consume() // consume equal sign
+
+	value, err := p.parseTypeExpr()
+
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	stmt := Stmt{
+		Data: []tokenizer.Token{typeName},
+		Kind: STMT_KIND_TYPE_DECLARATION,
 		Expr: value,
 	}
 

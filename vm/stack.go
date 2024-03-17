@@ -42,6 +42,13 @@ func (s *Stack) PushBool(value bool) error {
 		Value:    value,
 	})
 }
+
+func (s *Stack) PushType(typeValue *RuntimeType) error {
+	return s.Push(RuntimeValue{
+		TypeName: TYPE_TYPE,
+		Value:    typeValue,
+	})
+}
 func (s *Stack) PushInt(value int64) error {
 	return s.Push(RuntimeValue{
 		Value:    value,

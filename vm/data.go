@@ -22,3 +22,8 @@ type RuntimeValue struct {
 	Value         interface{}
 	PossibleTypes []string
 }
+
+type RuntimeArray struct {
+	TypeName string
+	Values   []RuntimeValue
+}

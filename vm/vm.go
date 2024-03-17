@@ -105,13 +105,13 @@ loop:
 				return err
 			}
 			vm.stack.PushBool(!boolValue)
-		case JUMP:
+		case OP_JUMP:
 			addr, err := strconv.Atoi(instruction.Arg1)
 			if err != nil {
 				panic(err)
 			}
 			i = addr - 1
-		case JUMP_NOT, JUMP_IF:
+		case OP_JUMP_NOT, OP_JUMP_IF:
 			value, err := vm.stack.Pop()
 			if err != nil {
 				return err
@@ -127,7 +127,7 @@ loop:
 			if err != nil {
 				panic(err)
 			}
-			if (instruction.Code == JUMP && v) || (instruction.Code == JUMP_NOT && !v) {
+			if (instruction.Code == OP_JUMP && v) || (instruction.Code == OP_JUMP_NOT && !v) {
 				i = addr - 1
 			}
 
@@ -289,6 +289,37 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
+		case OP_ARR_INIT:
+			arrType := instruction.Arg1
+			_, err := vm.types.Get(arrType)
+			if err != nil {
+				return err
+			}
+			value := RuntimeValue{
+				Value: RuntimeArray{
+					TypeName: arrType,
+				},
+				TypeName: ARRAY_TYPE,
+			}
+			vm.stack.Push(value)
+		case OP_ARR_PUSH:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			array, err := vm.stack.Current()
+			if err != nil {
+				return err
+			}
+			if array.TypeName != ARRAY_TYPE {
+				return nomadError.RuntimeError("cannot push to non-array types", instruction.DebugToken)
+			}
+			runtimeArray, _ := array.Value.(RuntimeArray)
+			if runtimeArray.TypeName != value.TypeName {
+				return nomadError.RuntimeError(fmt.Sprintf("type mismatch, %s expected, %s given", runtimeArray.TypeName, value.TypeName), instruction.DebugToken)
+			}
+			runtimeArray.Values = append(runtimeArray.Values, *value)
+			array.Value = runtimeArray
 		case OP_POP_CONST:
 			vm.stack.Pop()
 		case OP_LOAD_VAR:
@@ -297,6 +328,30 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			vm.stack.Push(*value)
+		case OP_LOAD_TYPE:
+			value, err := vm.types.Get(instruction.Arg1)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			vm.stack.PushType(value)
+		case OP_DECL_TYPE:
+			value, err := vm.stack.Pop()
+
+			typeValue, ok := value.Value.(*RuntimeType)
+			if !ok {
+				panic("pointer to runtime type expected")
+			}
+
+			if err != nil {
+				return err
+			}
+
+			typeName := instruction.Arg1
+			err = vm.types.Add(typeName, typeValue, instruction.DebugToken)
+
+			if err != nil {
+				return err
+			}
 
 		default:
 			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)

@@ -5,18 +5,25 @@ import "fmt"
 const (
 	INT_TYPE    = "int"
 	BOOL_TYPE   = "bool"
+	TYPE_TYPE   = "type"
 	FLOAT_TYPE  = "float"
 	NUM_TYPE    = "num"
 	STRING_TYPE = "string"
+	ARRAY_TYPE  = "array"
 )
 
 type RuntimeType struct {
 	name    string
+	subtype string
 	methods map[string]Function
 }
 
 func (t *RuntimeType) GetName() string {
 	return t.name
+}
+
+func (t *RuntimeType) GetSubtype() string {
+	return t.subtype
 }
 
 func MakeIntType() *RuntimeType {
@@ -268,9 +275,15 @@ func MakeFloatType() *RuntimeType {
 		},
 	}
 }
-func MakeBoolype() *RuntimeType {
+func MakeBoolType() *RuntimeType {
 	return &RuntimeType{
 		name:    BOOL_TYPE,
+		methods: map[string]Function{}}
+}
+
+func MakeTypeType() *RuntimeType {
+	return &RuntimeType{
+		name:    TYPE_TYPE,
 		methods: map[string]Function{}}
 }
 
@@ -284,4 +297,10 @@ func (t *RuntimeType) GetMethod(name string) (Function, error) {
 		return res, fmt.Errorf("method %s::%s not found", t.GetName(), name)
 	}
 	return res, nil
+}
+
+func MakeArrayType() *RuntimeType {
+	return &RuntimeType{
+		name:    ARRAY_TYPE,
+		methods: map[string]Function{}}
 }

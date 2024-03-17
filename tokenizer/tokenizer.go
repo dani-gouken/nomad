@@ -18,6 +18,7 @@ const (
 	TOKEN_KIND_COMMA                = "TOKEN_KIND_COMMA"
 	TOKEN_KIND_EQUAL                = "TOKEN_KIND_EQUAL"
 	TOKEN_KIND_ID                   = "TOKEN_KIND_ID"
+	TOKEN_KIND_TYPE                 = "TOKEN_KIND_TYPE"
 	TOKEN_KIND_IF                   = "TOKEN_KIND_IF"
 	TOKEN_KIND_ELSE                 = "TOKEN_KIND_ELSE"
 	TOKEN_KIND_ELIF                 = "TOKEN_KIND_ELIF"
@@ -466,6 +467,9 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			}
 			if strings.ToLower(id) == "if" {
 				kind = TOKEN_KIND_IF
+			}
+			if strings.ToLower(id) == "type" {
+				kind = TOKEN_KIND_TYPE
 			}
 			if strings.ToLower(id) == "else" {
 				kind = TOKEN_KIND_ELSE
