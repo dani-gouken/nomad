@@ -49,6 +49,11 @@ func ApplyBinaryOp(symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*Runtim
 	if lhsType.IsInt() {
 		return ApplyBinaryOpToInt(symbol, lhs, rhs)
 	}
+
+	if lhsType.IsString() {
+		return ApplyBinaryOpToString(symbol, lhs, rhs)
+	}
+
 	return nil, fmt.Errorf("unsupported operand %s for type %s", symbol, lhs.RuntimeType.GetName())
 
 }

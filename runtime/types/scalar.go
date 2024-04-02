@@ -75,6 +75,10 @@ func MakeFloatType() *ScalarType {
 	return New(FLOAT_TYPE)
 }
 
+func MakeStringType() *ScalarType {
+	return New(STRING_TYPE)
+}
+
 func ExpectedFloatType(t RuntimeType) error {
 	tScalar, err := ToScalarType(t)
 	if err != nil {
@@ -96,6 +100,17 @@ func ExpectedIntType(t RuntimeType) error {
 		return fmt.Errorf("expected int type got %s", t.GetName())
 	}
 	if !tScalar.IsInt() {
+		return fmt.Errorf("expected int type got %s", t.GetName())
+	}
+	return nil
+}
+
+func ExpectedStringType(t RuntimeType) error {
+	tScalar, err := ToScalarType(t)
+	if err != nil {
+		return fmt.Errorf("expected string type got %s", t.GetName())
+	}
+	if !tScalar.IsString() {
 		return fmt.Errorf("expected int type got %s", t.GetName())
 	}
 	return nil

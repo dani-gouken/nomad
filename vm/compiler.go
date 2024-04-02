@@ -74,6 +74,21 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 					DebugToken: expr.Token,
 				},
 			}, nil
+		case tokenizer.TOKEN_KIND_STRING_LIT:
+			content := expr.Token.Content
+			if len(content) == 2 {
+				content = ""
+			} else {
+				content = content[1 : len(content)-1]
+			}
+			return []Instruction{
+				{
+					Code:       OP_PUSH_CONST,
+					Arg1:       types.STRING_TYPE,
+					Arg2:       content,
+					DebugToken: expr.Token,
+				},
+			}, nil
 		case tokenizer.TOKEN_KIND_FALSE:
 			return []Instruction{
 				{
@@ -275,9 +290,23 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, arrayInst...)
+		if expr.Token.Kind == tokenizer.TOKEN_KIND_NUM_LIT {
+			instructions = append(instructions, Instruction{
+				Code:       OP_PUSH_CONST,
+				Arg1:       types.INT_TYPE,
+				Arg2:       expr.Token.Content,
+				DebugToken: expr.Token,
+			})
+		} else {
+			instructions = append(instructions, Instruction{
+				Code:       OP_LOAD_VAR,
+				Arg1:       expr.Token.Content,
+				DebugToken: expr.Token,
+			})
+
+		}
 		instructions = append(instructions, Instruction{
 			Code:       OP_ARR_LOAD,
-			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
 		return instructions, nil

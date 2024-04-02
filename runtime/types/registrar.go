@@ -48,6 +48,7 @@ func NewRegistrar() Registrar {
 	r.Add(MakeFloatType(), tokenizer.Token{})
 	r.Add(MakeBoolType(), tokenizer.Token{})
 	r.Add(MakeTypeType(), tokenizer.Token{})
+	r.Add(MakeStringType(), tokenizer.Token{})
 
 	return r
 }

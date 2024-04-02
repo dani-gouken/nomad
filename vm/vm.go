@@ -68,6 +68,11 @@ func (vm *Vm) pushConst(runtimeType string, value string) error {
 			Value:       float64(floatVal),
 			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
+	case types.STRING_TYPE:
+		return vm.stack.Push(data.RuntimeValue{
+			Value:       value,
+			RuntimeType: vm.types.GetOrPanic(runtimeType),
+		})
 
 	default:
 		return fmt.Errorf("runtime error: unable to store value of runtime type %s", runtimeType)
@@ -333,6 +338,7 @@ loop:
 			runtimeArray.Values = append(runtimeArray.Values, *value)
 			array.Value = runtimeArray
 		case OP_ARR_LOAD:
+			index, err := vm.stack.Pop()
 			array, err := vm.stack.Pop()
 			if err != nil {
 				return err
@@ -342,12 +348,17 @@ loop:
 				return nomadError.RuntimeError("cannot push to non-array types", instruction.DebugToken)
 			}
 
-			runtimeArray, _ := array.Value.(data.RuntimeArray)
-			index, err := strconv.Atoi(instruction.Arg1)
+			err = types.ExpectedIntType(index.RuntimeType)
 			if err != nil {
-				return nomadError.RuntimeError("index should be aan integer", instruction.DebugToken)
+				return nomadError.RuntimeError("index should be an integer", instruction.DebugToken)
 			}
-			vm.stack.Push(runtimeArray.Values[index])
+
+			runtimeArray, _ := array.Value.(data.RuntimeArray)
+			i, _ := index.Value.(int64)
+			if err != nil {
+				return nomadError.RuntimeError("index should be an integer", instruction.DebugToken)
+			}
+			vm.stack.Push(runtimeArray.Values[i])
 		case OP_POP_CONST:
 			vm.stack.Pop()
 		case OP_LOAD_VAR:

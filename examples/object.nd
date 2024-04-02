@@ -1,8 +1,12 @@
-type person = {name: string, age: int }
+type person = {
+    string name :: ""
+    int age :: 0
 
-Person a = Person {
-    name: "daniel",
-    age: 24,
+    func :: () {
+
+    }
 }
+
+Person a = Person { name :: "daniel", age :: 24 }
 
 print a.name

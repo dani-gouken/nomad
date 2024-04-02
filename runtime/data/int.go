@@ -78,6 +78,32 @@ func DivInt(a *RuntimeValue, b *RuntimeValue) (*RuntimeValue, error) {
 		RuntimeType: a.RuntimeType,
 		Value:       aInt / bInt,
 	}, nil
+
+}
+func CmpInt(a *RuntimeValue, b *RuntimeValue) (*RuntimeValue, error) {
+	err := types.ExpectedIntType(a.RuntimeType)
+	if err != nil {
+		return nil, err
+	}
+	err = types.ExpectedIntType(b.RuntimeType)
+	if err != nil {
+		return nil, err
+	}
+	aInt := a.Value.(int64)
+	bInt := b.Value.(int64)
+	var result int64 = 0
+
+	if aInt < bInt {
+		result = -1
+	}
+
+	if aInt > bInt {
+		result = 1
+	}
+	return &RuntimeValue{
+		RuntimeType: a.RuntimeType,
+		Value:       result,
+	}, nil
 }
 
 func ApplyBinaryOpToInt(symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*RuntimeValue, error) {
@@ -90,6 +116,8 @@ func ApplyBinaryOpToInt(symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*R
 		return MultInt(lhs, rhs)
 	case "/":
 		return DivInt(lhs, rhs)
+	case "<->":
+		return CmpInt(lhs, rhs)
 	default:
 		return nil, fmt.Errorf("unsupported operand %s for type %s", symbol, lhs.RuntimeType.GetName())
 	}

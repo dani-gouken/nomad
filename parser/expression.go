@@ -502,7 +502,10 @@ func (p *Parser) parseArrayAccess(baseExpr Expr) (Expr, *nomadError.ParseError) 
 
 	err = p.expectNextF(tokenizer.TOKEN_KIND_NUM_LIT, 1, "index")
 	if err != nil {
-		return baseExpr, nil
+		err = p.expectNextF(tokenizer.TOKEN_KIND_ID, 1, "identifier")
+		if err != nil {
+			return baseExpr, nil
+		}
 	}
 	err = p.expectNextNF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, 2, "closing bracket (])")
 	if err != nil {
