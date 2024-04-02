@@ -16,11 +16,7 @@ const (
 )
 
 func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
-	expr, err := p.parseBaseExpr()
-	if err != nil {
-		return expr, err
-	}
-	return p.parseArrayAccess(expr)
+	return p.parseBaseExpr()
 }
 
 func (p *Parser) parseBaseExpr() (Expr, *nomadError.ParseError) {
@@ -407,6 +403,14 @@ func (p *Parser) parseExprList(endTokenKind string) (Expr, *nomadError.ParseErro
 }
 
 func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
+	primaryExpr, err := p.parseBasePrimaryExpr()
+	if err != nil {
+		return primaryExpr, err
+	}
+	return p.parseArrayAccess(primaryExpr)
+}
+
+func (p *Parser) parseBasePrimaryExpr() (Expr, *nomadError.ParseError) {
 	expr, err := p.parseConstantExpr()
 	if err == nil {
 		return expr, err

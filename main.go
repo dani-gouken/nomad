@@ -9,10 +9,7 @@ import (
 
 func main() {
 
-	if len(os.Args) < 2 {
-		panic("source file is needed")
-	}
-	sourceFile := os.Args[1]
+	sourceFile := "examples/string.nd"
 	bytes, err := os.ReadFile(sourceFile)
 	if err != nil {
 		panic(err)

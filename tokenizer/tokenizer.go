@@ -377,7 +377,6 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokStart := t.col
 			opener := r
-			isStart := true
 			for {
 				stop := false
 				c, ok = t.peek()
@@ -387,7 +386,7 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				r, _ = utf8.DecodeRuneInString(c)
 				if r == opener {
 					previous, _ := t.peekAt(-1)
-					if !isStart && previous != "\\" {
+					if previous != "\\" {
 						stop = true
 					}
 				}
@@ -397,7 +396,6 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				if stop {
 					break
 				}
-				isStart = false
 
 			}
 			tokEnd := t.col

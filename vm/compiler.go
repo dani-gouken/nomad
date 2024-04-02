@@ -378,7 +378,7 @@ func (c *Compiler) CompileStmt() error {
 			if label == "" {
 				label = c.label(branch.Kind, branch)
 			}
-			var nextLabel string
+			var nextLabel string = exitIfLabel
 			if i+1 < len(branches) {
 				nextLabel = c.label(branches[i+1].Kind, branches[i+1])
 			}
@@ -529,6 +529,7 @@ func RemoveLabels(instructions []Instruction) ([]Instruction, error) {
 			labels[instruction.Arg1] = i + 1
 		}
 	}
+
 	for i := 0; i < len(instructions); i++ {
 		instruction := &instructions[i]
 		if instruction.Code == OP_JUMP || instruction.Code == OP_JUMP_NOT {
