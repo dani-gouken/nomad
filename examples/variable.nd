@@ -1,10 +1,10 @@
 float result :: 0.0
 
-int a :: 40
-int b :: 4
-a :: 2
+float a :: 40.0
+float b :: 4.0
+a :: 2.0
 
 result :: ((a / b) + 2.0)
 
 print result
-print result == 12.0
+print result = 12.0

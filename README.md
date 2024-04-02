@@ -9,7 +9,8 @@
 ## Todo
 - [x] Variables
 - [x] Math
+- [x] Literal types (inte)
 - [x] Literal types
+- [x] Control flow
 - [ ] Advanced types
-- [ ] Control flow
 - [ ] Polymorphism

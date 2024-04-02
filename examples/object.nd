@@ -1,0 +1,8 @@
+type person = {name: string, age: int }
+
+Person a = Person {
+    name: "daniel",
+    age: 24,
+}
+
+print a.name

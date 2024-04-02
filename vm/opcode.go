@@ -25,6 +25,7 @@ const (
 	OP_CMP          = "CMP"
 	OP_ADD          = "ADD"
 	OP_DIV          = "DIV"
+	OP_ARR_LOAD     = "ARR_LOAD"
 	OP_SUB          = "SUB"
 	OP_DECL_TYPE    = "DECL_TYPE"
 	OP_RETURN       = "RETURN"
@@ -35,6 +36,7 @@ const (
 	OP_JUMP_IF      = "JUMP_IF"
 	OP_JUMP         = "JUMP"
 	OP_ARR_INIT     = "ARR_INIT"
+	OP_ARR_TYPE     = "ARR_TYPE"
 	OP_ARR_APPEND   = "ARR_APPEND"
 	OP_ARR_PUSH     = "ARR_PUSH"
 )

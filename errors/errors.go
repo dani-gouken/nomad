@@ -35,6 +35,10 @@ func NewParseError(message string, debugToken tokenizer.Token, crash bool) *Pars
 	return &ParseError{message: fmt.Sprintf("%s: parse error. %s", DebugToken(debugToken), message), crash: crash}
 }
 
+func NewParseErrorFromMessage(message string, crash bool) *ParseError {
+	return &ParseError{message: message, crash: crash}
+}
+
 func FatalParseError(message string, debugToken tokenizer.Token) *ParseError {
 	return NewParseError(message, debugToken, true)
 }

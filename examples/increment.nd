@@ -2,4 +2,6 @@ int i :: 0
 i++
 i++
 print i
+
+float j :: 0.0
 j++

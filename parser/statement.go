@@ -269,33 +269,39 @@ func (p *Parser) parseAssignment() ([]*Stmt, *nomadError.ParseError) {
 }
 
 func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
-	err := p.expectNF(tokenizer.TOKEN_KIND_ID, "identifier (type)")
+	pos := p.cursor
+	t, _ := p.peek()
+	typeExpr, err := p.parseTypeExpr()
 	if err != nil {
 		return []*Stmt{}, err
 	}
-	err = p.expectNextNF(tokenizer.TOKEN_KIND_ID, 1, "identifier (variable name)")
+	err = p.expectNF(tokenizer.TOKEN_KIND_ID, "identifier (variable name)")
 	if err != nil {
+		p.rollback(pos)
 		return []*Stmt{}, err
 	}
-	err = p.expectNextF(tokenizer.TOKEN_KIND_DB_COLON, 2, "double colon (::)")
-	if err != nil {
-		return []*Stmt{}, err
-	}
-	varType, _ := p.peek()
-	p.consume()
 	varName, _ := p.peek()
 	p.consume()
+	err = p.expectF(tokenizer.TOKEN_KIND_DB_COLON, "double colon (::)")
+	if err != nil {
+		return []*Stmt{}, err
+	}
 	p.consume() // consume equal sign
-
 	value, err := p.parseExpr()
 
 	if err != nil {
 		return []*Stmt{}, err
 	}
 	stmt := Stmt{
-		Data: []tokenizer.Token{varType, varName},
+		Data: []tokenizer.Token{varName},
 		Kind: STMT_KIND_VAR_DECLARATION,
-		Expr: value,
+		Expr: Expr{
+			Kind:  EXPR_KIND_ANONYMOUS,
+			Token: t, Exprs: []Expr{
+				typeExpr,
+				value,
+			},
+		},
 	}
 
 	p.terminateStmt(stmt)

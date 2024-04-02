@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	nomadError "github.com/dani-gouken/nomad/errors"
+	"github.com/dani-gouken/nomad/runtime/data"
+	"github.com/dani-gouken/nomad/runtime/types"
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
@@ -17,7 +19,7 @@ type Vm struct {
 	fp    int
 	stack Stack
 	env   Environment
-	types TypeRegistrar
+	types types.Registrar
 }
 
 func (vm *Vm) Env() *Environment {
@@ -37,34 +39,34 @@ func New() *Vm {
 			pointer: 1,
 		},
 		env:   NewEnvironment(),
-		types: NewTypeRegistrar(),
+		types: types.NewRegistrar(),
 	}
 }
 
 func (vm *Vm) pushConst(runtimeType string, value string) error {
 	switch runtimeType {
-	case BOOL_TYPE:
-		return vm.stack.Push(RuntimeValue{
-			Value:    value == OP_CONST_TRUE,
-			TypeName: runtimeType,
+	case types.BOOL_TYPE:
+		return vm.stack.Push(data.RuntimeValue{
+			Value:       value == OP_CONST_TRUE,
+			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
-	case INT_TYPE:
+	case types.INT_TYPE:
 		intVal, err := strconv.Atoi(value)
 		if err != nil {
 			return err
 		}
-		return vm.stack.Push(RuntimeValue{
-			Value:    int64(intVal),
-			TypeName: runtimeType,
+		return vm.stack.Push(data.RuntimeValue{
+			Value:       int64(intVal),
+			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
-	case FLOAT_TYPE:
+	case types.FLOAT_TYPE:
 		floatVal, err := strconv.ParseFloat(value, 64)
 		if err != nil {
 			return err
 		}
-		return vm.stack.Push(RuntimeValue{
-			Value:    float64(floatVal),
-			TypeName: runtimeType,
+		return vm.stack.Push(data.RuntimeValue{
+			Value:       float64(floatVal),
+			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
 
 	default:
@@ -90,21 +92,22 @@ loop:
 		case OP_DEBUG_PRINT:
 			value, err := vm.stack.Current()
 			if err == nil {
-				fmt.Println(*value)
+				fmt.Printf("<%s> %v\n", value.RuntimeType.GetName(), value.Value)
 			}
 		case OP_NOT:
 			value, err := vm.stack.Pop()
 			if err != nil {
 				return err
 			}
-			if value.TypeName != BOOL_TYPE {
-				return nomadError.RuntimeErrorUnsupportedOperand("not(!)", value.TypeName, instruction.DebugToken)
+			err = types.ExpectedBoolType(value.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeErrorUnsupportedOperand("not(!)", value.RuntimeType.GetName(), instruction.DebugToken)
 			}
 			boolValue := value.Value.(bool)
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool(!boolValue)
+			vm.stack.PushBool(vm.types, !boolValue)
 		case OP_JUMP:
 			addr, err := strconv.Atoi(instruction.Arg1)
 			if err != nil {
@@ -116,8 +119,9 @@ loop:
 			if err != nil {
 				return err
 			}
-			if value.TypeName != BOOL_TYPE {
-				return nomadError.RuntimeErrorUnsupportedOperand("boolean expected for comparison", value.TypeName, instruction.DebugToken)
+			err = types.ExpectedBoolType(value.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeErrorUnsupportedOperand("boolean expected for comparison", value.RuntimeType.GetName(), instruction.DebugToken)
 			}
 			v, ok := value.Value.(bool)
 			if !ok {
@@ -136,15 +140,15 @@ loop:
 			if err != nil {
 				return err
 			}
-			switch value.TypeName {
-			case INT_TYPE:
+			switch value.RuntimeType.GetName() {
+			case types.INT_TYPE:
 				intValue := value.Value.(int64)
-				vm.stack.PushInt(-intValue)
-			case FLOAT_TYPE:
+				vm.stack.PushInt(vm.types, -intValue)
+			case types.FLOAT_TYPE:
 				floatValue := value.Value.(float64)
-				vm.stack.PushFloat(-floatValue)
+				vm.stack.PushFloat(vm.types, -floatValue)
 			default:
-				return nomadError.RuntimeErrorUnsupportedOperand("negative (-)", value.TypeName, instruction.DebugToken)
+				return nomadError.RuntimeErrorUnsupportedOperand("negative (-)", value.RuntimeType.GetName(), instruction.DebugToken)
 			}
 		case OP_EQ:
 			rhs, err := vm.stack.Pop()
@@ -155,7 +159,7 @@ loop:
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool(rhs.Value == lhs.Value)
+			vm.stack.PushBool(vm.types, rhs.Value == lhs.Value)
 		case OP_EQ_2:
 			rhs, err := vm.stack.Pop()
 			if err != nil {
@@ -169,7 +173,7 @@ loop:
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool((rhs.Value == lhs1.Value) || (rhs.Value == lhs2.Value))
+			vm.stack.PushBool(vm.types, (rhs.Value == lhs1.Value) || (rhs.Value == lhs2.Value))
 		case OP_ADD, OP_SUB, OP_MULT, OP_DIV, OP_CMP:
 			rhs, err := vm.stack.Pop()
 			if err != nil {
@@ -183,17 +187,12 @@ loop:
 			if err != nil {
 				return err
 			}
-			t, err := vm.types.Get(lhs.TypeName)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			_, err = t.GetMethod(opSymbol)
+			result, err := data.ApplyBinaryOp(opSymbol, lhs, rhs)
 			if err != nil {
-				return nomadError.RuntimeErrorUnsupportedOperand(opSymbol, t.name, instruction.DebugToken)
-			}
-			result, err := vm.CallMethod(lhs, opSymbol, instruction.DebugToken, rhs)
-			if err != nil {
-				return err
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			vm.stack.Push(*result)
 		case OP_OR, OP_AND:
@@ -209,11 +208,11 @@ loop:
 			if err != nil {
 				return err
 			}
-			if lhs.TypeName != BOOL_TYPE {
-				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, lhs.TypeName), instruction.DebugToken)
+			if lhs.RuntimeType.GetName() != types.BOOL_TYPE {
+				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, lhs.RuntimeType.GetName()), instruction.DebugToken)
 			}
-			if rhs.TypeName != BOOL_TYPE {
-				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, rhs.TypeName), instruction.DebugToken)
+			if rhs.RuntimeType.GetName() != types.BOOL_TYPE {
+				return nomadError.RuntimeError(fmt.Sprintf("cannot call operator %s on value of type %s", opSymbol, rhs.RuntimeType.GetName()), instruction.DebugToken)
 			}
 			lhsValue := lhs.Value.(bool)
 			rhsValue := rhs.Value.(bool)
@@ -223,7 +222,7 @@ loop:
 			} else {
 				res = lhsValue && rhsValue
 			}
-			vm.stack.PushBool(res)
+			vm.stack.PushBool(vm.types, res)
 		case OP_PUSH_SCOPE:
 			vm.Env().PushScope()
 		case OP_LABEL:
@@ -241,67 +240,78 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			err = vm.checkTypeCompatibility(variable.TypeName, value.TypeName)
+			err = variable.RuntimeType.Match(value.RuntimeType)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			variable.Value = value.Value
-			variable.TypeName = value.TypeName
 		case OP_DECL_VAR:
 			value, err := vm.stack.Pop()
+			t, err := vm.stack.Pop()
 
+			tScalar, err := types.ToScalarType(t.RuntimeType)
 			if err != nil {
 				return err
 			}
 
-			declaredTypeName := instruction.Arg1
-			declaredType, err := vm.types.Get(declaredTypeName)
-			possibleTypes := []*RuntimeType{}
-
-			if err != nil {
-				compositeType, err := vm.types.GetComposite(declaredTypeName)
-				if err != nil {
-					return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
-				}
-				for i := 0; i < len(compositeType.Cases); i++ {
-					t, err := vm.types.Get(compositeType.Cases[i])
-					if err != nil {
-						return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
-					}
-					possibleTypes = append(possibleTypes, t)
-				}
-			} else {
-				possibleTypes = append(possibleTypes, declaredType)
+			if !tScalar.IsType() {
+				return nomadError.RuntimeError(fmt.Sprintf("type value expected, got %s", t.RuntimeType.GetName()), instruction.DebugToken)
 			}
 
-			valueType, err := vm.types.Get(value.TypeName)
+			declaredType := t.Value.(types.RuntimeType)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			name := instruction.Arg2
 			err = vm.Env().DeclareVariable(
 				name,
-				valueType,
 				value,
 				declaredType,
-				possibleTypes,
 			)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 		case OP_ARR_INIT:
-			arrType := instruction.Arg1
-			_, err := vm.types.Get(arrType)
+			t, err := vm.stack.Pop()
 			if err != nil {
 				return err
 			}
-			value := RuntimeValue{
-				Value: RuntimeArray{
-					TypeName: arrType,
-				},
-				TypeName: ARRAY_TYPE,
+
+			tScalar, err := types.ToScalarType(t.RuntimeType)
+			if err != nil {
+				return err
+			}
+			err = types.ExpectedTypeType(tScalar)
+			if err != nil {
+				return err
+			}
+
+			arraySubType := t.Value.(types.RuntimeType)
+			arrayType := types.NewArrayType(arraySubType)
+			value := data.RuntimeValue{
+				Value:       data.RuntimeArray{},
+				RuntimeType: arrayType,
 			}
 			vm.stack.Push(value)
+		case OP_ARR_TYPE:
+			t, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+
+			tScalar, err := types.ToScalarType(t.RuntimeType)
+			if err != nil {
+				return err
+			}
+			err = types.ExpectedTypeType(tScalar)
+			if err != nil {
+				return err
+			}
+
+			arraySubType := t.Value.(types.RuntimeType)
+			arrayType := types.NewArrayType(arraySubType)
+			vm.stack.PushType(vm.types, arrayType)
+
 		case OP_ARR_PUSH:
 			value, err := vm.stack.Pop()
 			if err != nil {
@@ -311,15 +321,33 @@ loop:
 			if err != nil {
 				return err
 			}
-			if array.TypeName != ARRAY_TYPE {
+			t, err := types.ToArrayType(array.RuntimeType)
+			if err != nil {
 				return nomadError.RuntimeError("cannot push to non-array types", instruction.DebugToken)
 			}
-			runtimeArray, _ := array.Value.(RuntimeArray)
-			if runtimeArray.TypeName != value.TypeName {
-				return nomadError.RuntimeError(fmt.Sprintf("type mismatch, %s expected, %s given", runtimeArray.TypeName, value.TypeName), instruction.DebugToken)
+			runtimeArray, _ := array.Value.(data.RuntimeArray)
+			err = t.MatchSubtype(value.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(fmt.Sprintf("type mismatch, %s expected, %s given", t.GetSubtype().GetName(), value.RuntimeType.GetName()), instruction.DebugToken)
 			}
 			runtimeArray.Values = append(runtimeArray.Values, *value)
 			array.Value = runtimeArray
+		case OP_ARR_LOAD:
+			array, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			_, err = types.ToArrayType(array.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError("cannot push to non-array types", instruction.DebugToken)
+			}
+
+			runtimeArray, _ := array.Value.(data.RuntimeArray)
+			index, err := strconv.Atoi(instruction.Arg1)
+			if err != nil {
+				return nomadError.RuntimeError("index should be aan integer", instruction.DebugToken)
+			}
+			vm.stack.Push(runtimeArray.Values[index])
 		case OP_POP_CONST:
 			vm.stack.Pop()
 		case OP_LOAD_VAR:
@@ -333,25 +361,7 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.PushType(value)
-		case OP_DECL_TYPE:
-			value, err := vm.stack.Pop()
-
-			typeValue, ok := value.Value.(*RuntimeType)
-			if !ok {
-				panic("pointer to runtime type expected")
-			}
-
-			if err != nil {
-				return err
-			}
-
-			typeName := instruction.Arg1
-			err = vm.types.Add(typeName, typeValue, instruction.DebugToken)
-
-			if err != nil {
-				return err
-			}
+			vm.stack.PushType(vm.types, value)
 
 		default:
 			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
@@ -378,74 +388,4 @@ func OpToSymbol(op string) (string, error) {
 	}
 	return "", fmt.Errorf("unknown operator %s", op)
 
-}
-
-func (vm *Vm) checkTypeCompatibility(typeA string, typeB string) error {
-	possibleTypesA, err := vm.types.GetPossible(typeA)
-
-	if err != nil {
-		return err
-	}
-	possibleTypesB, err := vm.types.GetPossible(typeB)
-	if err != nil {
-		return err
-	}
-
-	for i := 0; i < len(possibleTypesA); i++ {
-		possibleA := possibleTypesA[i]
-		for j := 0; j < len(possibleTypesB); j++ {
-			possibleB := possibleTypesB[j]
-			if possibleA == possibleB {
-				return nil
-			}
-		}
-
-	}
-	return fmt.Errorf("type %s is not compatible with %s", typeA, typeB)
-}
-func (vm *Vm) CallMethod(self *RuntimeValue, method string, debugToken tokenizer.Token, parameters ...*RuntimeValue) (*RuntimeValue, error) {
-	t, err := vm.types.Get(self.TypeName)
-	if err != nil {
-		return nil, nomadError.RuntimeError(err.Error(), debugToken)
-	}
-	function, err := t.GetMethod(method)
-	if err != nil {
-		return nil, nomadError.RuntimeError(err.Error(), debugToken)
-	}
-	callParameters := []ParameterValue{
-		{
-			Value: self,
-			Parameter: Parameter{
-				Name:     "self",
-				Self:     true,
-				TypeName: self.TypeName,
-			},
-		},
-	}
-	if len(parameters) != (len(function.Signature) - 1) {
-		return nil, nomadError.RuntimeError(fmt.Sprintf("invalid parameter when calling %s::%s, expected %d parameters got %d", self.TypeName, method, len(function.Signature), len(parameters)), debugToken)
-	}
-
-	for i := 0; i < len(function.Signature)-1; i++ {
-
-		parameter := function.Signature[i+1]
-		value := parameters[i]
-		err := vm.checkTypeCompatibility(parameter.TypeName, value.TypeName)
-
-		if err != nil {
-			return nil, nomadError.RuntimeError(fmt.Sprintf("type mismatch on %s::%s, expected parameter %d to be %s got %s", self.TypeName, method, i+1, parameter.TypeName, value.TypeName), debugToken)
-		}
-		callParameters = append(callParameters, ParameterValue{
-			Parameter: parameter,
-			Value:     value,
-		})
-	}
-	result, err := function.Run(callParameters)
-	if err != nil {
-		return nil, nomadError.RuntimeError(err.Error(), debugToken)
-	}
-	if result.TypeName != function.ReturnTypeName {
-		return nil, nomadError.RuntimeError(fmt.Sprintf("expected return type for %s::%s is %s got %s", self.TypeName, method, function.ReturnTypeName, result.TypeName), debugToken)
-	}
-	return result, err
 }

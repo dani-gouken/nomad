@@ -7,6 +7,7 @@ import (
 
 	nomadErrors "github.com/dani-gouken/nomad/errors"
 	"github.com/dani-gouken/nomad/parser"
+	"github.com/dani-gouken/nomad/runtime/types"
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
@@ -29,6 +30,15 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Code:       OP_NOT,
 			DebugToken: expr.Token,
 		}), nil
+	case parser.EXPR_KIND_ANONYMOUS:
+		for i := 0; i < len(expr.Exprs); i++ {
+			compiled, err := CompileExpr(expr.Exprs[i])
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, compiled...)
+		}
+		return instructions, nil
 	case parser.EXPR_KIND_NEGATIVE:
 		compiled, err := CompileExpr(expr.Exprs[0])
 		if err != nil {
@@ -46,15 +56,15 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return []Instruction{
 				{
 					Code:       OP_PUSH_CONST,
-					Arg1:       BOOL_TYPE,
+					Arg1:       types.BOOL_TYPE,
 					Arg2:       OP_CONST_TRUE,
 					DebugToken: expr.Token,
 				},
 			}, nil
 		case tokenizer.TOKEN_KIND_NUM_LIT:
-			numType := INT_TYPE
+			numType := types.INT_TYPE
 			if strings.Contains(t.Content, ".") {
-				numType = FLOAT_TYPE
+				numType = types.FLOAT_TYPE
 			}
 			return []Instruction{
 				{
@@ -68,7 +78,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return []Instruction{
 				{
 					Code:       OP_PUSH_CONST,
-					Arg1:       BOOL_TYPE,
+					Arg1:       types.BOOL_TYPE,
 					Arg2:       OP_CONST_FALSE,
 					DebugToken: expr.Token,
 				},
@@ -150,7 +160,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		instructions = append(instructions, Instruction{
 			Code:       OP_PUSH_CONST,
 			DebugToken: expr.Token,
-			Arg1:       INT_TYPE,
+			Arg1:       types.INT_TYPE,
 			Arg2:       expected,
 		})
 		instructions = append(instructions, Instruction{
@@ -166,13 +176,13 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		instructions = append(instructions, Instruction{
 			Code:       OP_PUSH_CONST,
 			DebugToken: expr.Token,
-			Arg1:       INT_TYPE,
+			Arg1:       types.INT_TYPE,
 			Arg2:       expected,
 		})
 		instructions = append(instructions, Instruction{
 			Code:       OP_PUSH_CONST,
 			DebugToken: expr.Token,
-			Arg1:       INT_TYPE,
+			Arg1:       types.INT_TYPE,
 			Arg2:       "0",
 		})
 		exprInstructions, err := CompileComp(expr)
@@ -197,7 +207,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		instructions = append(instructions, Instruction{
 			Code:       OP_PUSH_CONST,
 			DebugToken: expr.Token,
-			Arg1:       INT_TYPE,
+			Arg1:       types.INT_TYPE,
 			Arg2:       "1",
 		})
 		instructions = append(instructions, Instruction{
@@ -223,22 +233,53 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_ARRAY:
+		typeExpr := expr.Exprs[0]
+		itemsExpr := expr.Exprs[1]
+		typeInstr, err := CompileExpr(typeExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, typeInstr...)
 		instructions = append(instructions, Instruction{
 			Code:       OP_ARR_INIT,
-			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
-		for i := 0; i < len(expr.Exprs); i++ {
-			exprInstructions, err := CompileExpr(expr.Exprs[i])
+		for i := 0; i < len(itemsExpr.Exprs); i++ {
+			exprInstructions, err := CompileExpr(itemsExpr.Exprs[i])
 			if err != nil {
 				return instructions, err
 			}
 			instructions = append(instructions, exprInstructions...)
 			instructions = append(instructions, Instruction{
 				Code:       OP_ARR_PUSH,
-				DebugToken: expr.Exprs[i].Token,
+				DebugToken: itemsExpr.Exprs[i].Token,
 			})
 		}
+		return instructions, nil
+	case parser.EXPR_KIND_TYPE_ARRAY:
+		typeExpr := expr.Exprs[0]
+		typeInstr, err := CompileExpr(typeExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, typeInstr...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_ARR_TYPE,
+			DebugToken: expr.Token,
+		})
+		return instructions, nil
+	case parser.EXPR_KIND_ARRAY_ACCESS:
+		typeExpr := expr.Exprs[0]
+		arrayInst, err := CompileExpr(typeExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, arrayInst...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_ARR_LOAD,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
 		return instructions, nil
 	}
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
@@ -358,7 +399,7 @@ func (c *Compiler) CompileStmt() error {
 		c.instructions = append(c.instructions, testExprInstructions...)
 		c.instructions = append(c.instructions, Instruction{
 			Code: OP_PUSH_CONST,
-			Arg1: BOOL_TYPE,
+			Arg1: types.BOOL_TYPE,
 			Arg2: OP_CONST_TRUE,
 		})
 		c.instructions = append(c.instructions, Instruction{
@@ -420,13 +461,11 @@ func (c *Compiler) CompileStmt() error {
 		c.consume()
 		return err
 	case parser.STMT_KIND_VAR_DECLARATION:
-		varType := stmt.Data[0].Content
-		varName := stmt.Data[1].Content
+		varName := stmt.Data[0].Content
 		compiled, err := CompileExpr(stmt.Expr)
 		c.instructions = append(c.instructions, compiled...)
 		c.instructions = append(c.instructions, Instruction{
 			Code:       OP_DECL_VAR,
-			Arg1:       varType,
 			Arg2:       varName,
 			DebugToken: stmt.Expr.Token,
 		})

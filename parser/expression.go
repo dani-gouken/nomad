@@ -16,6 +16,14 @@ const (
 )
 
 func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
+	expr, err := p.parseBaseExpr()
+	if err != nil {
+		return expr, err
+	}
+	return p.parseArrayAccess(expr)
+}
+
+func (p *Parser) parseBaseExpr() (Expr, *nomadError.ParseError) {
 	primaryExpr, err := p.parsePrimaryExpr()
 	if err != nil {
 		return primaryExpr, err
@@ -321,59 +329,72 @@ func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
 	return expr, nil
 }
 func (p *Parser) parseArrayExpr() (Expr, *nomadError.ParseError) {
-	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening bracket ([)")
-	if err != nil {
-		return Expr{}, err
-	}
-	err = p.expectNextNF(tokenizer.TOKEN_KIND_ID, 1, "identifier (type)")
-	if err != nil {
-		return Expr{}, err
-	}
-	err = p.expectNextF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, 2, "closing bracket (])")
+	pos := p.cursor
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening square bracket ([)")
 	if err != nil {
 		return Expr{}, err
 	}
 	p.consume()
-	arrType, _ := p.peek()
-	p.consume()
-	p.consume()
-	err = p.expectF(tokenizer.TOKEN_KIND_LEFT_CURCLY, "opening bracket ({)")
+	arrayTypeExpr, err := p.parseTypeExpr()
+	if err != nil {
+		p.rollback(pos)
+		return Expr{}, err
+	}
 
+	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, "closing square bracket (])")
 	if err != nil {
 		return Expr{}, err
 	}
 	p.consume()
-	items, err := p.parseExprList(tokenizer.TOKEN_KIND_RIGHT_CURLY)
+
+	err = p.expectF(tokenizer.TOKEN_KIND_LEFT_CURCLY, "opening bracket ({)")
 	if err != nil {
 		return Expr{}, err
 	}
+	p.consume()
+
+	itemsExpr, err := p.parseExprList(tokenizer.TOKEN_KIND_RIGHT_CURLY)
+	if err != nil {
+		return Expr{}, err
+	}
+
 	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_CURLY, "opening bracket (})")
 	p.consume()
 	if err != nil {
 		return Expr{}, err
 	}
+
 	return Expr{
 		Kind:  EXPR_KIND_ARRAY,
-		Token: arrType,
-		Exprs: items,
+		Token: arrayTypeExpr.Token,
+		Exprs: []Expr{
+			arrayTypeExpr,
+			itemsExpr,
+		},
 	}, nil
 
 }
 
-func (p *Parser) parseExprList(endTokenKind string) ([]Expr, *nomadError.ParseError) {
+func (p *Parser) parseExprList(endTokenKind string) (Expr, *nomadError.ParseError) {
 	list := []Expr{}
 
 	for {
 		token, _ := p.peek()
 
 		if token.Kind == endTokenKind {
-			return list, nil
+			return Expr{
+				Kind:  EXPR_KIND_ANONYMOUS,
+				Exprs: list,
+			}, nil
 		}
 
 		expr, err := p.parseExpr()
 
 		if err != nil {
-			return list, err
+			return Expr{
+				Kind:  EXPR_KIND_ANONYMOUS,
+				Exprs: list,
+			}, err
 		}
 
 		list = append(list, expr)
@@ -386,7 +407,6 @@ func (p *Parser) parseExprList(endTokenKind string) ([]Expr, *nomadError.ParseEr
 }
 
 func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
-
 	expr, err := p.parseConstantExpr()
 	if err == nil {
 		return expr, err
@@ -399,8 +419,8 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 	if err == nil {
 		return expr, err
 	}
-	expr, err = p.parseIdExpr()
 
+	expr, err = p.parseIdExpr()
 	if err == nil {
 		return expr, err
 	}
@@ -429,4 +449,73 @@ func ExprToSExpr(expr Expr) string {
 	}
 	sexpr += ")"
 	return sexpr
+}
+
+func (p *Parser) parseTypeExpr() (Expr, *nomadError.ParseError) {
+	t, _ := p.peek()
+	if t.Kind == tokenizer.TOKEN_KIND_ID {
+		p.consume()
+		return Expr{
+			Kind:  EXPR_KIND_TYPE,
+			Token: t,
+		}, nil
+	}
+	if t.Kind == tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET {
+		expr, err := p.parseArrayTypeExpr()
+		if err != nil {
+			return Expr{}, err
+		}
+		return expr, nil
+	}
+	return Expr{}, nomadError.NonFatalParseError("could not parse type expression", t)
+}
+
+func (p *Parser) parseArrayTypeExpr() (Expr, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening bracket ([)")
+	if err != nil {
+		return Expr{}, err
+	}
+	t, _ := p.peek()
+	p.consume()
+	typeExpr, err := p.parseTypeExpr()
+	if err != nil {
+		p.spit()
+		return Expr{}, err
+	}
+	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, "closing bracket (])")
+	p.consume()
+	if err != nil {
+		return Expr{}, err
+	}
+	return Expr{
+		Kind:  EXPR_KIND_TYPE_ARRAY,
+		Exprs: []Expr{typeExpr},
+		Token: t,
+	}, nil
+}
+
+func (p *Parser) parseArrayAccess(baseExpr Expr) (Expr, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening bracket ([)")
+	if err != nil {
+		return baseExpr, nil
+	}
+
+	err = p.expectNextF(tokenizer.TOKEN_KIND_NUM_LIT, 1, "index")
+	if err != nil {
+		return baseExpr, nil
+	}
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, 2, "closing bracket (])")
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+	index, _ := p.peek()
+	p.consume()
+	p.consume()
+
+	return p.parseArrayAccess(Expr{
+		Kind:  EXPR_KIND_ARRAY_ACCESS,
+		Exprs: []Expr{baseExpr},
+		Token: index,
+	})
 }

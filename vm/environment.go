@@ -2,12 +2,15 @@ package vm
 
 import (
 	"fmt"
+
+	"github.com/dani-gouken/nomad/runtime/data"
+	"github.com/dani-gouken/nomad/runtime/types"
 )
 
 const ROOT_SCOPE = 0
 
 type Scope struct {
-	variables map[string]*RuntimeValue
+	variables map[string]*data.RuntimeValue
 	parent    int
 	id        int
 }
@@ -54,22 +57,14 @@ func (e *Environment) PopScope() error {
 	return nil
 }
 
-func (s *Scope) DeclareVariable(name string, value interface{}, runtimeType *RuntimeType, declaredType *RuntimeType, possibleTypes []*RuntimeType) error {
-	runtimeTypeValid := false
-	possibleTypesName := []string{}
-	for i := 0; i < len(possibleTypes); i++ {
-		if !runtimeTypeValid && (possibleTypes[i].name == runtimeType.GetName()) {
-			runtimeTypeValid = true
-		}
-		possibleTypesName = append(possibleTypesName, possibleTypes[i].GetName())
+func (s *Scope) DeclareVariable(name string, runtimeValue *data.RuntimeValue, declaredType types.RuntimeType) error {
+	err := declaredType.Match(runtimeValue.RuntimeType)
+	if err != nil {
+		return fmt.Errorf("type mismatch, could not assign value of type %s to the variable %s declared as %s", runtimeValue.RuntimeType.GetName(), name, declaredType.GetName())
 	}
-	if !runtimeTypeValid {
-		return fmt.Errorf("type mismatch, could not assign value of type %s to the variable %s declared as %s", runtimeType.GetName(), name, declaredType.name)
-	}
-	s.variables[name] = &RuntimeValue{
-		TypeName:      runtimeType.GetName(),
-		Value:         value,
-		PossibleTypes: possibleTypesName,
+	s.variables[name] = &data.RuntimeValue{
+		RuntimeType: declaredType,
+		Value:       runtimeValue.Value,
 	}
 	return nil
 }
@@ -78,7 +73,7 @@ func (s *Scope) UnsetVariable(name string) {
 	delete(s.variables, name)
 }
 
-func (s *Scope) GetVariable(name string) (*RuntimeValue, error) {
+func (s *Scope) GetVariable(name string) (*data.RuntimeValue, error) {
 	value, ok := s.variables[name]
 	if !ok {
 		return value, fmt.Errorf("undefined variable %s", name)
@@ -87,16 +82,14 @@ func (s *Scope) GetVariable(name string) (*RuntimeValue, error) {
 }
 func (e *Environment) DeclareVariable(
 	name string,
-	runtimeType *RuntimeType,
-	runtimeValue *RuntimeValue,
-	declaredType *RuntimeType,
-	possibleTypes []*RuntimeType,
+	runtimeValue *data.RuntimeValue,
+	declaredType types.RuntimeType,
 ) error {
 	scope, err := e.GetCurrentScope()
 	if err != nil {
 		return err
 	}
-	return scope.DeclareVariable(name, runtimeValue.Value, runtimeType, declaredType, possibleTypes)
+	return scope.DeclareVariable(name, runtimeValue, declaredType)
 }
 
 func (e *Environment) UnsetVariable(name string) error {
@@ -108,7 +101,7 @@ func (e *Environment) UnsetVariable(name string) error {
 	return nil
 }
 
-func (e *Environment) GetVariable(name string) (*RuntimeValue, error) {
+func (e *Environment) GetVariable(name string) (*data.RuntimeValue, error) {
 	scope, err := e.GetCurrentScope()
 	if err != nil {
 		return nil, err
@@ -119,7 +112,7 @@ func (e *Environment) GetVariable(name string) (*RuntimeValue, error) {
 func NewEnvironment() Environment {
 	scopes := make(map[int]Scope)
 	scopes[ROOT_SCOPE] = Scope{
-		variables: map[string]*RuntimeValue{},
+		variables: map[string]*data.RuntimeValue{},
 	}
 	return Environment{
 		currentScope: ROOT_SCOPE,
