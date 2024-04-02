@@ -11,13 +11,13 @@ Examples are in the `examples` folder
 ### example
 
 ```
-[string] parts :: [string]{"daniel", "nghokeng", "stéphane"};
-string fullname :: " ";
+[string] parts :: [string]{"daniel", "nghokeng", "stéphane"}
+string fullname :: ""
 
 for int i :: 0; i <= 2; i++ {
-    fullname  = fullname + parts[i];
+    fullname :: fullname + parts[i];
     if i < 2 {
-        fullname  = " " + fullname
+        fullname :: fullname + " "
     }
 }
 
