@@ -97,7 +97,7 @@ loop:
 		case OP_DEBUG_PRINT:
 			value, err := vm.stack.Current()
 			if err == nil {
-				fmt.Printf("<%s>%v\n", value.RuntimeType.GetName(), value.Value)
+				fmt.Printf("<%s> %v\n", value.RuntimeType.GetName(), value.Value)
 			}
 		case OP_NOT:
 			value, err := vm.stack.Pop()
@@ -214,7 +214,7 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			result, err := data.ApplyBinaryOp(opSymbol, lhs, rhs)
+			result, err := data.ApplyBinaryOp(vm.types, opSymbol, lhs, rhs)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}

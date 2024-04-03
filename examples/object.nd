@@ -1,12 +1,7 @@
 type person = {
     string name :: ""
     int age :: 0
-
-    func :: () {
-
-    }
 }
 
-Person a = Person { name :: "daniel", age :: 24 }
-
-print a.name
+// Person a = Person { name :: "daniel", age :: 24 }
+// print a.name

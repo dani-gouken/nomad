@@ -32,7 +32,7 @@ type RuntimeArray struct {
 	Values []RuntimeValue
 }
 
-func ApplyBinaryOp(symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*RuntimeValue, error) {
+func ApplyBinaryOp(t types.Registrar, symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*RuntimeValue, error) {
 	err := lhs.RuntimeType.Match(rhs.RuntimeType)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func ApplyBinaryOp(symbol string, lhs *RuntimeValue, rhs *RuntimeValue) (*Runtim
 	}
 
 	if lhsType.IsFloat() {
-		return ApplyBinaryOpToFloat(symbol, lhs, rhs)
+		return ApplyBinaryOpToFloat(t, symbol, lhs, rhs)
 	}
 
 	if lhsType.IsInt() {

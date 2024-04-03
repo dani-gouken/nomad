@@ -222,15 +222,30 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			})
 		case r == '/':
 			t.consume()
-			tokens = append(tokens, Token{
-				Kind: TOKEN_KIND_SLASH,
-				Loc: TokenLoc{
-					Start: t.col,
-					End:   t.col,
-					Line:  t.line,
-				},
-				Content: c,
-			})
+			t2, _ := t.peek()
+			if t2 == "/" {
+				t.consume()
+				for {
+					t3, ok := t.peek()
+					if !ok {
+						break
+					}
+					t.consume()
+					if t3 == "\n" {
+						break
+					}
+				}
+			} else {
+				tokens = append(tokens, Token{
+					Kind: TOKEN_KIND_SLASH,
+					Loc: TokenLoc{
+						Start: t.col,
+						End:   t.col,
+						Line:  t.line,
+					},
+					Content: c,
+				})
+			}
 		case r == '!':
 			t.consume()
 			tokens = append(tokens, Token{

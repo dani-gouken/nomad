@@ -80,6 +80,7 @@ func DivInt(a *RuntimeValue, b *RuntimeValue) (*RuntimeValue, error) {
 	}, nil
 
 }
+
 func CmpInt(a *RuntimeValue, b *RuntimeValue) (*RuntimeValue, error) {
 	err := types.ExpectedIntType(a.RuntimeType)
 	if err != nil {
