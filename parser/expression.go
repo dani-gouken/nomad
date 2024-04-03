@@ -10,6 +10,7 @@ import (
 const (
 	OPERATOR_PRECEDENCE_INVALID = iota
 	OPERATOR_PRECEDENCE_MINIMUM
+	OPERATOR_PRECEDENCE_LOW
 	OPERATOR_PRECEDENCE_REGULAR
 	OPERATOR_PRECEDENCE_HIGH
 	OPERATOR_PRECEDENCE_HIGHEST
@@ -141,9 +142,10 @@ func isBinaryOperatorToken(t tokenizer.Token) bool {
 }
 func getBinaryOperatorPrecedence(t tokenizer.Token) uint {
 	switch t.Kind {
+	case tokenizer.TOKEN_KIND_EQUAL:
+		return OPERATOR_PRECEDENCE_LOW
 	case tokenizer.TOKEN_KIND_PLUS,
 		tokenizer.TOKEN_KIND_MINUS,
-		tokenizer.TOKEN_KIND_EQUAL,
 		tokenizer.TOKEN_KIND_SLASH,
 		tokenizer.TOKEN_KIND_INFERIOR_SIGN,
 		tokenizer.TOKEN_KIND_INFERIOR_OR_EQ_SIGN,

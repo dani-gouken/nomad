@@ -13,10 +13,12 @@ Examples are in the `examples` folder
 ```
 [string] parts :: [string]{"daniel", "nghokeng", "stéphane"}
 string fullname :: ""
+int size :: len parts
 
-for int i :: 0; i < len parts; i++ {
+for int i :: 0; i < size; i++ {
     fullname :: fullname + parts[i];
-    if i < 2 {
+    bool last :: i = size - 1
+    if !last {
         fullname :: fullname + " "
     }
 }
