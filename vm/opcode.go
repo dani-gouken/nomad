@@ -39,4 +39,5 @@ const (
 	OP_ARR_TYPE     = "ARR_TYPE"
 	OP_ARR_APPEND   = "ARR_APPEND"
 	OP_ARR_PUSH     = "ARR_PUSH"
+	OP_LEN          = "LEN"
 )

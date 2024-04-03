@@ -27,6 +27,7 @@ const (
 	EXPR_KIND_MORE_THAN_OR_EQ = "MORE_THAN_OR_EQ"
 	EXPR_KIND_EQ              = "EQUAL"
 	EXPR_KIND_OR              = "OR"
+	EXPR_KIND_LEN             = "LEN"
 	EXPR_KIND_AND             = "AND"
 	EXPR_KIND_ID              = "IDENTIFIER"
 	EXPR_KIND_LOOP            = "LOOP"

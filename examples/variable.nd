@@ -1,4 +1,4 @@
-float result :: 0.0
+float result :: 0.0;
 
 float a :: 40.0
 float b :: 4.0
@@ -8,3 +8,6 @@ result :: ((a / b) + 2.0)
 
 print result
 print result = 12.0
+
+string name :: "nghokeng daniel"
+print name

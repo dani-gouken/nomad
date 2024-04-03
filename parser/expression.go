@@ -61,6 +61,20 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 				expr,
 			},
 		}, nil
+	case tokenizer.TOKEN_KIND_LEN:
+		p.consume()
+		expr, err := p.parsePrimaryExpr()
+		if err != nil {
+			p.spit()
+			return Expr{}, err
+		}
+		return Expr{
+			Kind:  EXPR_KIND_LEN,
+			Token: t,
+			Exprs: []Expr{
+				expr,
+			},
+		}, nil
 
 	case tokenizer.TOKEN_KIND_DB_MINUS:
 		p.consume()

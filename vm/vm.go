@@ -155,6 +155,25 @@ loop:
 			default:
 				return nomadError.RuntimeErrorUnsupportedOperand("negative (-)", value.RuntimeType.GetName(), instruction.DebugToken)
 			}
+		case OP_LEN:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			_, arrayTypeErr := types.ToArrayType(value.RuntimeType)
+			scalarType, scalarTypeErr := types.ToScalarType(value.RuntimeType)
+
+			if (arrayTypeErr != nil && scalarTypeErr != nil) || (scalarTypeErr == nil && !scalarType.IsString()) {
+				return nomadError.RuntimeErrorUnsupportedOperand("len", value.RuntimeType.GetName(), instruction.DebugToken)
+			}
+			if arrayTypeErr == nil {
+				arrValue := value.Value.(data.RuntimeArray)
+				vm.stack.PushInt(vm.types, int64(len(arrValue.Values)))
+			}
+			if scalarTypeErr == nil {
+				stringValue := value.Value.(string)
+				vm.stack.PushInt(vm.types, int64(len(stringValue)))
+			}
 		case OP_EQ:
 			rhs, err := vm.stack.Pop()
 			if err != nil {

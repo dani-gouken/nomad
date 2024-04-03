@@ -30,6 +30,16 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Code:       OP_NOT,
 			DebugToken: expr.Token,
 		}), nil
+	case parser.EXPR_KIND_LEN:
+		compiled, err := CompileExpr(expr.Exprs[0])
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, compiled...)
+		return append(instructions, Instruction{
+			Code:       OP_LEN,
+			DebugToken: expr.Token,
+		}), nil
 	case parser.EXPR_KIND_ANONYMOUS:
 		for i := 0; i < len(expr.Exprs); i++ {
 			compiled, err := CompileExpr(expr.Exprs[i])

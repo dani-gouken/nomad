@@ -49,6 +49,7 @@ const (
 	TOKEN_KIND_LEFT_CURCLY          = "TOKEN_KIND_LEFT_CURCLY"
 	TOKEN_KIND_RIGHT_CURLY          = "TOKEN_KIND_RIGHT_CURLY"
 	TOKEN_KIND_PRINT                = "TOKEN_KIND_PRINT"
+	TOKEN_KIND_LEN                  = "TOKEN_KIND_LEN"
 )
 
 type TokenLoc struct {
@@ -474,6 +475,9 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			}
 			if strings.ToLower(id) == "elif" {
 				kind = TOKEN_KIND_ELIF
+			}
+			if strings.ToLower(id) == "len" {
+				kind = TOKEN_KIND_LEN
 			}
 			if strings.ToLower(id) == "for" {
 				kind = TOKEN_KIND_FOR
