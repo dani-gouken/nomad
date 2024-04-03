@@ -30,10 +30,10 @@ print fullname
 ## Todo
 - [x] Variables
 - [x] Math
-- [x] Literal types (inte)
 - [x] Literal types
 - [x] Control flow
 - [x] Array
 - [ ] Object
+- [ ] Advanced types
 
 #
