@@ -294,8 +294,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		return instructions, nil
 	case parser.EXPR_KIND_ARRAY_ACCESS:
-		typeExpr := expr.Exprs[0]
-		arrayInst, err := CompileExpr(typeExpr)
+		arrayExpr := expr.Exprs[0]
+		arrayInst, err := CompileExpr(arrayExpr)
 		if err != nil {
 			return instructions, err
 		}
@@ -317,6 +317,81 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		instructions = append(instructions, Instruction{
 			Code:       OP_ARR_LOAD,
+			DebugToken: expr.Token,
+		})
+		return instructions, nil
+	case parser.EXPR_KIND_TYPE_OBJ:
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_TYPE,
+			DebugToken: expr.Token,
+		})
+		for _, v := range expr.Exprs {
+			exprs, err := CompileExpr(v)
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, exprs...)
+		}
+		return instructions, nil
+	case parser.EXPR_KIND_OBJ:
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_INIT,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
+		for _, v := range expr.Exprs {
+			exprs, err := CompileExpr(v)
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, exprs...)
+		}
+		return instructions, nil
+	case parser.EXPR_KIND_TYPE_OBJ_FIELD:
+		typeExpr := expr.Exprs[0]
+		valueExpr := expr.Exprs[1]
+
+		exprs, err := CompileExpr(typeExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, exprs...)
+
+		exprs, err = CompileExpr(valueExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, exprs...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_TYPE_SET_FIELD,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
+		return instructions, err
+	case parser.EXPR_KIND_OBJ_FIELD:
+		valueExpr := expr.Exprs[0]
+
+		exprs, err := CompileExpr(valueExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, exprs...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_SET_FIELD,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
+		return instructions, err
+	case parser.EXPR_KIND_OBJ_ACCESS:
+		objExpr := expr.Exprs[0]
+		objInst, err := CompileExpr(objExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, objInst...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_LOAD,
+			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
 		return instructions, nil

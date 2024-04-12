@@ -35,6 +35,12 @@ const (
 	EXPR_KIND_ANONYMOUS       = "ANONYMOUS"
 	EXPR_KIND_TYPE_ASSOC      = "TYPE_ASSOC"
 	EXPR_KIND_TYPE_ARRAY      = "TYPE_ARRAY"
+	EXPR_KIND_TYPE_OBJ        = "TYPE_OBJ"
+	EXPR_KIND_TYPE_OBJ_FIELD  = "TYPE_OBJ_FIELD"
+
+	EXPR_KIND_OBJ_FIELD  = "OBJ_FIELD"
+	EXPR_KIND_OBJ        = "OBJ"
+	EXPR_KIND_OBJ_ACCESS = "OBJ_ACCESS"
 )
 
 type Parser struct {
@@ -60,7 +66,6 @@ type Expr struct {
 }
 
 func (p *Parser) parse() (*Program, error) {
-
 	return p.parseProgram()
 }
 
@@ -98,6 +103,15 @@ func (p *Parser) peekAt(pos int) (tokenizer.Token, bool) {
 
 func (p *Parser) consume() {
 	p.cursor++
+}
+func (p *Parser) cleanupNewLines() {
+	for {
+		t, _ := p.peek()
+		if t.Kind != tokenizer.TOKEN_KIND_NEW_LINE {
+			break
+		}
+		p.consume()
+	}
 }
 
 func (p *Parser) rollback(position int) {

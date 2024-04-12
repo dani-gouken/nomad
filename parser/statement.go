@@ -23,11 +23,17 @@ const (
 func (p *Parser) parseStmts() ([]*Stmt, *nomadError.ParseError) {
 	stmts := []*Stmt{}
 	for {
-		_, ok := p.peek()
+		t, ok := p.peek()
 
 		if !ok {
 			break
 		}
+
+		if t.Kind == tokenizer.TOKEN_KIND_NEW_LINE {
+			p.consume()
+			continue
+		}
+
 		newStmts, err := p.parseStmt()
 
 		if err != nil {
@@ -95,15 +101,16 @@ func (p *Parser) parseBlock() ([]*Stmt, *nomadError.ParseError) {
 	}
 	previousToken, _ := p.peek()
 	p.consume()
+	p.cleanupNewLines()
 
 	for {
 		token, ok := p.peek()
 		if !ok {
 			return nil, nomadError.FatalParseError(fmt.Sprintf("non-terminated block, %s expected", tokenizer.TOKEN_KIND_RIGHT_CURLY), previousToken)
 		}
-
 		if token.Kind == tokenizer.TOKEN_KIND_RIGHT_CURLY {
 			p.consume()
+			p.cleanupNewLines()
 			break
 		}
 
@@ -133,7 +140,6 @@ func (p *Parser) parseFlowControlStatement(tokenKind string, statementKind strin
 		if err != nil {
 			return stmts, err
 		}
-
 		stmt = Stmt{
 			Data: []tokenizer.Token{
 				token,
@@ -151,6 +157,7 @@ func (p *Parser) parseFlowControlStatement(tokenKind string, statementKind strin
 
 	}
 	stmts = append(stmts, &stmt)
+	p.cleanupNewLines()
 	blockStmts, err := p.parseBlock()
 	stmt.Children = blockStmts
 	if err != nil {
@@ -185,6 +192,7 @@ func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
 	iterStmt, err := p.parseAssignment()
 	if err != nil {
 		iterStmt, err = p.parseImplicitReturnStmt()
+
 		if err != nil {
 			return nil, err
 		}
@@ -242,6 +250,7 @@ func (p *Parser) parseIfStatement() ([]*Stmt, *nomadError.ParseError) {
 func (p *Parser) parseAssignment() ([]*Stmt, *nomadError.ParseError) {
 	stmts := []*Stmt{}
 	err := p.expectNF(tokenizer.TOKEN_KIND_ID, "identifier (variable name)")
+
 	if err != nil {
 		return stmts, err
 	}
@@ -367,14 +376,11 @@ func (p *Parser) terminateStmt(stmt Stmt) *nomadError.ParseError {
 	if stmt.Kind == STMT_KIND_IF {
 		return nil
 	}
-	err := p.expectF(tokenizer.TOKEN_KIND_SEMI_COLON, "semi colon (;) or new Line")
+	p.cleanupNewLines()
+	err := p.expectF(tokenizer.TOKEN_KIND_SEMI_COLON, "semi colon (;)")
 	if err == nil {
 		p.consume()
-		return nil
-	}
-	err = p.expectF(tokenizer.TOKEN_KIND_NEW_LINE, "semi colon (;) or new Line")
-	if err == nil {
-		p.consume()
+		p.cleanupNewLines()
 		return nil
 	}
 	if p.isEOF() {

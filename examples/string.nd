@@ -3,7 +3,7 @@ string fullname :: ""
 int size :: len parts
 
 for int i :: 0; i < size; i++ {
-    fullname :: fullname + parts[i];
+    fullname :: fullname + parts[i]
     bool last :: i = size - 1
     if !last {
         fullname :: fullname + " "

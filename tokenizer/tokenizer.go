@@ -50,6 +50,8 @@ const (
 	TOKEN_KIND_RIGHT_CURLY          = "TOKEN_KIND_RIGHT_CURLY"
 	TOKEN_KIND_PRINT                = "TOKEN_KIND_PRINT"
 	TOKEN_KIND_LEN                  = "TOKEN_KIND_LEN"
+	TOKEN_KIND_NEW                  = "TOKEN_KIND_NEW"
+	TOKEN_KIND_DOT                  = "TOKEN_KIND_DOT"
 )
 
 type TokenLoc struct {
@@ -90,16 +92,19 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 		switch true {
 		case r == '\n':
 			t.line++
+			previous, ok := t.peekAt(-1)
 			t.consume()
-			// tokens = append(tokens, Token{
-			// 	Kind: TOKEN_KIND_NEW_LINE,
-			// 	Loc: TokenLoc{
-			// 		Start: t.col,
-			// 		End:   t.col,
-			// 		Line:  t.line,
-			// 	},
-			// 	Content: c,
-			// })
+			if ok && previous != "\n" {
+				tokens = append(tokens, Token{
+					Kind: TOKEN_KIND_NEW_LINE,
+					Loc: TokenLoc{
+						Start: t.col,
+						End:   t.col,
+						Line:  t.line,
+					},
+					Content: c,
+				})
+			}
 			t.col = 0
 		// white space
 		case unicode.IsSpace(r):
@@ -388,6 +393,17 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				},
 				Content: c,
 			})
+		case r == '.':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_DOT,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
 		case isQuote(r):
 			string := c
 			t.consume()
@@ -496,6 +512,9 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			}
 			if strings.ToLower(id) == "for" {
 				kind = TOKEN_KIND_FOR
+			}
+			if strings.ToLower(id) == "new" {
+				kind = TOKEN_KIND_NEW
 			}
 			if strings.ToLower(id) == "print" {
 				kind = TOKEN_KIND_PRINT

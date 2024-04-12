@@ -96,8 +96,33 @@ loop:
 			}
 		case OP_DEBUG_PRINT:
 			value, err := vm.stack.Current()
-			if err == nil {
+			if err != nil {
+				return err
+			}
+			_, err = types.ToObjectType(value.RuntimeType)
+			if err != nil {
 				fmt.Printf("<%s> %v\n", value.RuntimeType.GetName(), value.Value)
+			} else {
+				vObj := value.Value.(*data.RuntimeObject)
+				fmt.Print(value.RuntimeType.GetName())
+				fmt.Print("{")
+				lastKey := ""
+
+				for k1 := range vObj.GetFields() {
+					lastKey = k1
+				}
+				for k, v := range vObj.GetFields() {
+					fmt.Print(v.RuntimeType.GetName())
+					fmt.Print(" ")
+					fmt.Print(k)
+					fmt.Print(" ")
+					fmt.Print(v.Value)
+					if k != lastKey {
+						fmt.Print(", ")
+					}
+				}
+				fmt.Print("}")
+				fmt.Print("\n")
 			}
 		case OP_NOT:
 			value, err := vm.stack.Pop()
@@ -392,7 +417,135 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			vm.stack.PushType(vm.types, value)
+		case OP_DECL_TYPE:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			err = types.ExpectedTypeType(value.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			vType := value.Value.(types.RuntimeType)
+			objectType, err := types.ToObjectType(vType)
+			if err == nil && objectType.IsAnonymous() {
+				objectType.SetName(instruction.Arg1)
+				vm.types.Add(objectType, instruction.DebugToken)
+			} else {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+		case OP_OBJ_TYPE:
+			obj := types.NewObjectType()
+			vm.stack.PushType(vm.types, obj)
+		case OP_OBJ_INIT:
+			typeName := instruction.Arg1
+			t, err := vm.types.Get(typeName)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
 
+			tObj, err := types.ToObjectType(t)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			obj := data.NewRuntimeObject()
+			for k, v := range tObj.GetDefaults() {
+				vValue, ok := v.(data.RuntimeValue)
+				if !ok {
+					return nomadError.RuntimeError("object default is expected to be a runtime value", instruction.DebugToken)
+				}
+				obj.SetField(k, vValue)
+			}
+
+			vm.stack.Push(data.RuntimeValue{
+				RuntimeType: t,
+				Value:       obj,
+			})
+
+		case OP_OBJ_TYPE_SET_FIELD:
+			fieldDefaultValue, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			fieldTypeValue, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = types.ExpectedTypeType(fieldTypeValue.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			fieldType := fieldTypeValue.Value.(types.RuntimeType)
+
+			object, err := vm.stack.Current()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = types.ExpectedTypeType(object.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			objectTypeValue := object.Value.(types.RuntimeType)
+
+			objectType, err := types.ToObjectType(objectTypeValue)
+
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			objectType.AddField(instruction.Arg1, fieldType, *fieldDefaultValue)
+		case OP_OBJ_SET_FIELD:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			field := instruction.Arg1
+
+			objectValue, err := vm.stack.Current()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			t, err := types.ToObjectType(objectValue.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			object := objectValue.Value.(*data.RuntimeObject)
+			fieldType, err := t.GetFieldType(field)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = fieldType.Match(value.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			object.SetField(field, *value)
+		case OP_OBJ_LOAD:
+			objectValue, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			_, err = types.ToObjectType(objectValue.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			object := objectValue.Value.(*data.RuntimeObject)
+			field := instruction.Arg1
+			v, err := object.GetField(field)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			vm.stack.Push(*v)
 		default:
 			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
 		}

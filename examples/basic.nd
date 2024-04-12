@@ -1,4 +1,4 @@
-struct Person {
+type Person :: {
     string  name        :: ""
     string  surname     :: ""
     int     age         :: 0
@@ -9,7 +9,7 @@ struct Person {
 func is_major :: (Person person) string | if person.age > 18 then 'Major' else 'Minor' 
 
 
-Person daniel = {
+Person daniel :: new Person {
     name :: "Daniel"
     surname :: "Steph"
 }
@@ -32,4 +32,3 @@ func zero(float|int num) bool {
     } 
 
 }
-type person = {name: string, age: int }

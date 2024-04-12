@@ -1,7 +1,33 @@
-type person = {
+type Header  :: {
     string name :: ""
-    int age :: 0
+    string value :: ""
 }
 
-// Person a = Person { name :: "daniel", age :: 24 }
-// print a.name
+type HttpResponse :: {
+    int status :: 0
+    string body :: ""
+    [Header] headers :: [Header]{}
+}
+
+type HttpStatus :: {
+    int OK :: 200 
+    int ValidationError :: 422 
+    int Unauthorized :: 401 
+    int Redirect :: 301 
+}
+
+HttpStatus status :: new HttpStatus{}
+
+HttpResponse res :: new HttpResponse{
+    status :: status.OK
+    body :: "Hello world"
+    headers :: [Header]{
+        new Header { name :: "Content-Type", value :: "application/json" }
+        new Header { name :: "Content-Lenght", value :: "0" }
+    }
+}
+
+print res.status
+print res.body
+print res.headers
+print res
