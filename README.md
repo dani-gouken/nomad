@@ -2,7 +2,7 @@
 
 ## A simple interpreter build in Go
 
-Nomad is a toy programming language i built to learn go and programming language theory (lexical analysis, parsing, ...)
+Nomad is an interpreted programming language
 
 It compiles the program to bytecode which is later interpreted by a stack-based virtual machine
 
