@@ -424,10 +424,17 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 		return primaryExpr, err
 	}
 
-	primaryExpr, _ = p.parseArrayAccess(primaryExpr)
-	primaryExpr, _ = p.parseObjectAccess(primaryExpr)
+	primaryExpr, _ = p.parseAccessExpression(primaryExpr)
 
 	return primaryExpr, err
+}
+
+func (p *Parser) parseAccessExpression(baseExpr Expr) (Expr, *nomadError.ParseError) {
+	baseExpr, err := p.parseArrayAccess(baseExpr)
+	baseExpr, err = p.parseObjectAccess(baseExpr)
+
+	return baseExpr, err
+
 }
 
 func (p *Parser) parseBasePrimaryExpr() (Expr, *nomadError.ParseError) {
@@ -664,11 +671,11 @@ func (p *Parser) parseArrayTypeExpr() (Expr, *nomadError.ParseError) {
 	if err != nil {
 		return Expr{}, err
 	}
-	return Expr{
+	return p.parseAccessExpression(Expr{
 		Kind:  EXPR_KIND_TYPE_ARRAY,
 		Exprs: []Expr{typeExpr},
 		Token: t,
-	}, nil
+	})
 }
 
 func (p *Parser) parseObjectAccess(baseExpr Expr) (Expr, *nomadError.ParseError) {
@@ -686,7 +693,7 @@ func (p *Parser) parseObjectAccess(baseExpr Expr) (Expr, *nomadError.ParseError)
 	field, _ := p.peek()
 	p.consume()
 
-	return p.parseObjectAccess(Expr{
+	return p.parseAccessExpression(Expr{
 		Kind:  EXPR_KIND_OBJ_ACCESS,
 		Exprs: []Expr{baseExpr},
 		Token: field,

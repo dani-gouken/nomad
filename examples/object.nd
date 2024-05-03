@@ -30,4 +30,7 @@ HttpResponse res :: new HttpResponse{
 print res.status
 print res.body
 print res.headers
-print res
+print "headers"
+for int i :: 0; i < len res.headers; i++ {
+    print res.headers[i].value
+}
