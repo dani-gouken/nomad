@@ -546,6 +546,29 @@ loop:
 			}
 
 			vm.stack.Push(*v)
+		case OP_OBJ_TYPE_LOAD_DEFAULT:
+			objectTypeValue, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = types.ExpectedTypeType(objectTypeValue.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			t := objectTypeValue.Value.(types.RuntimeType)
+			objectType, err := types.ToObjectType(t)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			field := instruction.Arg1
+			v, err := objectType.GetFieldDefault(field)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			value := v.(data.RuntimeValue)
+			vm.stack.Push(value)
 		default:
 			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
 		}

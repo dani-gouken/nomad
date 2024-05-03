@@ -432,6 +432,7 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 func (p *Parser) parseAccessExpression(baseExpr Expr) (Expr, *nomadError.ParseError) {
 	baseExpr, err := p.parseArrayAccess(baseExpr)
 	baseExpr, err = p.parseObjectAccess(baseExpr)
+	baseExpr, err = p.parseDefaultAccess(&baseExpr)
 
 	return baseExpr, err
 
@@ -696,6 +697,32 @@ func (p *Parser) parseObjectAccess(baseExpr Expr) (Expr, *nomadError.ParseError)
 	return p.parseAccessExpression(Expr{
 		Kind:  EXPR_KIND_OBJ_ACCESS,
 		Exprs: []Expr{baseExpr},
+		Token: field,
+	})
+}
+func (p *Parser) parseDefaultAccess(baseExpr *Expr) (Expr, *nomadError.ParseError) {
+	if baseExpr.Kind != EXPR_KIND_ID {
+		return *baseExpr, nil
+	}
+
+	err := p.expectNF(tokenizer.TOKEN_KIND_HASH, "hash")
+	if err != nil {
+		return *baseExpr, nil
+	}
+
+	err = p.expectNextF(tokenizer.TOKEN_KIND_ID, 1, "identifier")
+	if err != nil {
+		return *baseExpr, nil
+	}
+
+	p.consume()
+	field, _ := p.peek()
+	p.consume()
+	baseExpr.Kind = EXPR_KIND_TYPE
+
+	return p.parseAccessExpression(Expr{
+		Kind:  EXPR_KIND_OBJ_DEFAULT_ACCESS,
+		Exprs: []Expr{*baseExpr},
 		Token: field,
 	})
 }

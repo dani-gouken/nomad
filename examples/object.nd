@@ -16,10 +16,9 @@ type HttpStatus :: {
     int Redirect :: 301 
 }
 
-HttpStatus status :: new HttpStatus{}
 
 HttpResponse res :: new HttpResponse{
-    status :: status.OK
+    status :: HttpStatus#OK
     body :: "Hello world"
     headers :: [Header]{
         new Header { name :: "Content-Type", value :: "application/json" }

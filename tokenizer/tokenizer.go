@@ -25,6 +25,7 @@ const (
 	TOKEN_KIND_FOR                  = "TOKEN_KIND_FOR"
 	TOKEN_KIND_NEW_LINE             = "TOKEN_KIND_NEW_LINE"
 	TOKEN_KIND_BANG                 = "TOKEN_KIND_BANG"
+	TOKEN_KIND_HASH                 = "TOKEN_KIND_HASH"
 	TOKEN_KIND_TRUE                 = "TOKEN_KIND_TRUE"
 	TOKEN_KIND_FALSE                = "TOKEN_KIND_FALSE"
 	TOKEN_KIND_MINUS                = "TOKEN_KIND_MINUS"
@@ -255,6 +256,17 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			t.consume()
 			tokens = append(tokens, Token{
 				Kind: TOKEN_KIND_BANG,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
+		case r == '#':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_HASH,
 				Loc: TokenLoc{
 					Start: t.col,
 					End:   t.col,

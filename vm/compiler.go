@@ -395,6 +395,19 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		})
 		return instructions, nil
+	case parser.EXPR_KIND_OBJ_DEFAULT_ACCESS:
+		objExpr := expr.Exprs[0]
+		objInst, err := CompileExpr(objExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, objInst...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_OBJ_TYPE_LOAD_DEFAULT,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		})
+		return instructions, nil
 	}
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
 }
