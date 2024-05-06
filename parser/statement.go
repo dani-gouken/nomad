@@ -18,6 +18,7 @@ const (
 	STMT_KIND_ELIF             = "ELIF"
 	STMT_KIND_SCOPE            = "SCOPE"
 	STMT_KIND_ASSIGNMENT       = "ASSIGNMENT"
+	STMT_KIND_RETURN           = "RETURN"
 )
 
 func (p *Parser) parseStmts() ([]*Stmt, *nomadError.ParseError) {
@@ -66,6 +67,7 @@ func (p *Parser) parseStmt() ([]*Stmt, *nomadError.ParseError) {
 	parseFuncs := []func() ([]*Stmt, *nomadError.ParseError){
 		p.parseAssignment,
 		p.parsePrint,
+		p.parseReturn,
 		p.parseTypeDeclaration,
 		p.parseVariableDeclaration,
 		p.parseIfStatement,
@@ -284,6 +286,7 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		return []*Stmt{}, err
 	}
+	p.cleanupNewLines()
 	err = p.expectNF(tokenizer.TOKEN_KIND_ID, "identifier (variable name)")
 	if err != nil {
 		p.rollback(pos)
@@ -306,7 +309,7 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 		Kind: STMT_KIND_VAR_DECLARATION,
 		Expr: Expr{
 			Kind:  EXPR_KIND_ANONYMOUS,
-			Token: t, Exprs: []Expr{
+			Token: t, Children: []Expr{
 				typeExpr,
 				value,
 			},
@@ -369,6 +372,25 @@ func (p *Parser) parsePrint() ([]*Stmt, *nomadError.ParseError) {
 
 	p.terminateStmt(stmt)
 
+	return []*Stmt{&stmt}, nil
+}
+
+func (p *Parser) parseReturn() ([]*Stmt, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_RETURN, "return (keyword)")
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	p.consume()
+	value, err := p.parseExpr()
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	stmt := Stmt{
+		Kind: STMT_KIND_RETURN,
+		Expr: value,
+	}
+
+	p.terminateStmt(stmt)
 	return []*Stmt{&stmt}, nil
 }
 

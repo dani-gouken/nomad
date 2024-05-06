@@ -37,6 +37,15 @@ const (
 	EXPR_KIND_TYPE_ARRAY      = "TYPE_ARRAY"
 	EXPR_KIND_TYPE_OBJ        = "TYPE_OBJ"
 	EXPR_KIND_TYPE_OBJ_FIELD  = "TYPE_OBJ_FIELD"
+	EXPR_KIND_TYPE_FUNC       = "TYPE_FUNC"
+
+	EXPR_KIND_FUNC            = "FUNC"
+	EXPR_KIND_FUNC_CALL       = "FUNC_CALL"
+	EXPR_KIND_FUNC_PARAM      = "FUNC_PARAM"
+	EXPR_KIND_FUNC_PARAM_LIST = "FUNC_PARAM_LIST"
+	EXPR_KIND_FUNC_ARG        = "FUNC_ARG"
+	EXPR_KIND_FUNC_ARG_LIST   = "FUNC_ARG_LIST"
+	EXPR_KIND_FUNC_NAMED_ARG  = "FUNC_NAMED_ARG"
 
 	EXPR_KIND_OBJ_FIELD          = "OBJ_FIELD"
 	EXPR_KIND_OBJ                = "OBJ"
@@ -61,9 +70,10 @@ type Stmt struct {
 }
 
 type Expr struct {
-	Kind  string
-	Token tokenizer.Token
-	Exprs []Expr
+	Kind     string
+	Token    tokenizer.Token
+	Children []Expr
+	Block    []*Stmt
 }
 
 func (p *Parser) parse() (*Program, error) {

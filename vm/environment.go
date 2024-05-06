@@ -21,6 +21,9 @@ type Environment struct {
 	scopeCounter int
 }
 
+func (e *Environment) GetLastRetrivedVarName() {
+
+}
 func (e *Environment) PushScope() Scope {
 	nextScopeId := e.scopeCounter + 1
 	scope := Scope{

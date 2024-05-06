@@ -67,7 +67,6 @@ print res.body
 - [x] Literal types
 - [x] Control flow
 - [x] Array
-- [ ] Object
-- [ ] Advanced types
-
+- [x] Object
+- [x] Advanced types
 #

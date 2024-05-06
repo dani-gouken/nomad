@@ -16,10 +16,53 @@ const (
 )
 
 type Vm struct {
-	fp    int
-	stack Stack
-	env   Environment
-	types types.Registrar
+	fp            int
+	sp            int
+	stack         Stack
+	env           Environment
+	arguments     []data.RuntimeValue
+	namedArgument map[string]data.RuntimeValue
+	types         types.Registrar
+}
+
+func (vm *Vm) PushPositionalArgument(arg data.RuntimeValue) {
+	vm.arguments = append([]data.RuntimeValue{arg}, vm.arguments...)
+}
+
+func (vm *Vm) ArgumentCount() int {
+	return len(vm.arguments) + len(vm.namedArgument)
+}
+
+func (vm *Vm) PushNamedArgument(name string, arg data.RuntimeValue) error {
+	_, ok := vm.namedArgument[name]
+	if ok {
+		return fmt.Errorf("duplicated argument [%s]", name)
+	}
+	vm.namedArgument[name] = arg
+	return nil
+}
+
+func (vm *Vm) PopNamedArgument(name string) (data.RuntimeValue, error) {
+	v, ok := vm.namedArgument[name]
+	if !ok {
+		return data.RuntimeValue{}, fmt.Errorf("unknown argument [%s]", name)
+	}
+	delete(vm.namedArgument, name)
+	return v, nil
+}
+
+func (vm *Vm) PopPositionalArgument() (data.RuntimeValue, error) {
+	if len(vm.arguments) == 0 {
+		return data.RuntimeValue{}, fmt.Errorf("the argument list is empty")
+	}
+	arg := vm.arguments[len(vm.arguments)-1]
+	vm.arguments = vm.arguments[:len(vm.arguments)-1]
+	return arg, nil
+}
+
+func (vm *Vm) ClearArguments() {
+	vm.namedArgument = make(map[string]data.RuntimeValue)
+	vm.arguments = []data.RuntimeValue{}
 }
 
 func (vm *Vm) Env() *Environment {
@@ -38,8 +81,10 @@ func New() *Vm {
 		stack: Stack{
 			pointer: 1,
 		},
-		env:   NewEnvironment(),
-		types: types.NewRegistrar(),
+		env:           NewEnvironment(),
+		types:         types.NewRegistrar(),
+		namedArgument: make(map[string]data.RuntimeValue),
+		arguments:     []data.RuntimeValue{},
 	}
 }
 
@@ -274,6 +319,71 @@ loop:
 			vm.stack.PushBool(vm.types, res)
 		case OP_PUSH_SCOPE:
 			vm.Env().PushScope()
+		case OP_PUSH_ARG:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			vm.PushPositionalArgument(*value)
+		case OP_FUNC_BEGIN:
+		case OP_FUNC_END:
+		case OP_RETURN:
+			returnedValue, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+
+			vm.stack.SetPointer(vm.sp)
+			i = vm.fp
+			vm.stack.Push(*returnedValue)
+			vm.env.PopScope()
+		case OP_CALL:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			_, err = types.ToFuncType(value.RuntimeType)
+			if err != nil {
+				return err
+			}
+			f := value.Value.(*data.RuntimeFunc)
+			if len(f.Signature.Parameters) < vm.ArgumentCount() {
+				return nomadError.RuntimeError(fmt.Sprintf(
+					"failed to call function %s :: %s, too much argument provided, %d declared, %d passed",
+					f.Tag, f.Signature.AsType().GetName(), len(f.Signature.Parameters), vm.ArgumentCount()), instruction.DebugToken)
+			}
+			// we move to the func begining
+			vm.env.PushScope()
+			for pName, pData := range f.Signature.Parameters {
+				value, err := vm.PopNamedArgument(pName)
+				if err != nil {
+					value, err = vm.PopPositionalArgument()
+					if err != nil {
+						if pData.HasDefault {
+							value = pData.DefaultValue
+						} else {
+							vm.env.PopScope()
+							return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+						}
+					}
+				}
+				err = value.RuntimeType.Match(pData.RuntimeType)
+				if err != nil {
+					vm.env.PopScope()
+					return nomadError.RuntimeError(
+						fmt.Sprintf("failed to call %s, type mismatch for parameter %s %s", f.Tag, pName, err.Error()), instruction.DebugToken)
+				}
+				vm.Env().DeclareVariable(pName, &value, pData.RuntimeType)
+			}
+			vm.fp = i
+			vm.sp = vm.stack.pointer
+			i = f.Begin - 1
+		case OP_PUSH_NAMED_ARG:
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			vm.PushNamedArgument(instruction.Arg1, *value)
 		case OP_LABEL:
 			continue
 		case OP_POP_SCOPE:
@@ -320,6 +430,12 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
+			_, err = types.ToFuncType(value.RuntimeType)
+			if err == nil {
+				f := value.Value.(*data.RuntimeFunc)
+				f.Tag = name
+			}
+
 		case OP_ARR_INIT:
 			t, err := vm.stack.Pop()
 			if err != nil {
@@ -437,6 +553,42 @@ loop:
 		case OP_OBJ_TYPE:
 			obj := types.NewObjectType()
 			vm.stack.PushType(vm.types, obj)
+		case OP_FUNC_TYPE:
+			obj := types.NewFuncType()
+			vm.stack.PushType(vm.types, obj)
+		case OP_FUNC_TYPE_SET_PARAM, OP_FUNC_TYPE_SET_RET:
+			t, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+			err = types.ExpectedTypeType(t.RuntimeType)
+			if err != nil {
+				return err
+			}
+
+			tType := t.Value.(types.RuntimeType)
+
+			f, err := vm.stack.Current()
+			if err != nil {
+				return err
+			}
+
+			err = types.ExpectedTypeType(f.RuntimeType)
+			if err != nil {
+				return err
+			}
+
+			fValue := f.Value.(types.RuntimeType)
+
+			fFunc, err := types.ToFuncType(fValue)
+			if err != nil {
+				return err
+			}
+			if instruction.Code == OP_FUNC_TYPE_SET_PARAM {
+				fFunc.AddParam(tType)
+			} else {
+				fFunc.SetRet(tType)
+			}
 		case OP_OBJ_INIT:
 			typeName := instruction.Arg1
 			t, err := vm.types.Get(typeName)
@@ -462,7 +614,85 @@ loop:
 				RuntimeType: t,
 				Value:       obj,
 			})
+		case OP_FUNC_INIT:
+			pointer, err := strconv.Atoi(instruction.Arg1)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
 
+			f := data.NewRuntimeFunc(&vm.types, pointer)
+			vm.stack.Push(data.RuntimeValue{
+				RuntimeType: f.Signature.AsType(),
+				Value:       f,
+			})
+		case OP_FUNC_SET_RET:
+			returnType, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = types.ExpectedTypeType(returnType.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			returnTypeValue := returnType.Value.(types.RuntimeType)
+
+			f, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			_, err = types.ToFuncType(f.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			fValue := f.Value.(*data.RuntimeFunc)
+			fValue.SetRet(returnTypeValue)
+			vm.stack.Push(data.RuntimeValue{
+				RuntimeType: fValue.Signature.AsType(),
+				Value:       fValue,
+			})
+		case OP_FUNC_SET_PARAM, OP_FUNC_SET_PARAM_WITH_DEFAULT:
+			paramName := instruction.Arg1
+			paramType, err := vm.stack.Pop()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			err = types.ExpectedTypeType(paramType.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			paramTypeValue := paramType.Value.(types.RuntimeType)
+
+			defaultValue := data.RuntimeValue{}
+			if instruction.Code == OP_FUNC_SET_PARAM_WITH_DEFAULT {
+				defaultValuePtr, err := vm.stack.Pop()
+				if err != nil {
+					return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+				}
+				defaultValue = *defaultValuePtr
+			}
+			f, err := vm.stack.Pop()
+
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
+			_, err = types.ToFuncType(f.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			fValue := f.Value.(*data.RuntimeFunc)
+			err = fValue.AddParam(paramName, paramTypeValue, defaultValue)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			vm.stack.Push(data.RuntimeValue{
+				RuntimeType: fValue.Signature.AsType(),
+				Value:       fValue,
+			})
 		case OP_OBJ_TYPE_SET_FIELD:
 			fieldDefaultValue, err := vm.stack.Pop()
 			if err != nil {

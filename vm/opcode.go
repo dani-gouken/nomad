@@ -8,7 +8,7 @@ const (
 	OP_POP_CONST             = "POP_CONST"
 	OP_LOAD_VAR              = "LOAD_VAR"
 	OP_LOAD_TYPE             = "LOAD_TYPE"
-	FUNC_CALL                = "FUNC_CALL"
+	CALL                     = "CALL"
 	OP_PUSH_CONST            = "PUSH_CONST"
 	OP_PUSH_SCOPE            = "PUSH_SCOPE"
 	OP_POP_SCOPE             = "POP_SCOPE"
@@ -46,4 +46,19 @@ const (
 	OP_OBJ_INIT              = "OBJ_INIT"
 	OP_OBJ_SET_FIELD         = "OBJ_SET_FIELD"
 	OP_OBJ_LOAD              = "OBJ_LOAD"
+
+	OP_FUNC_BEGIN                  = "FUNC_BEGIN"
+	OP_FUNC_END                    = "FUNC_END"
+	OP_FUNC_INIT                   = "FUNC_INIT"
+	OP_FUNC_SET_PARAM              = "FUNC_SET_PARAM"
+	OP_FUNC_SET_PARAM_WITH_DEFAULT = "FUNC_SET_PARAM_WITH_DEFAULT"
+	OP_FUNC_SET_RET                = "FUNC_SET_RET"
+	OP_CALL                        = "CALL"
+
+	OP_PUSH_ARG       = "PUSH_ARG"
+	OP_PUSH_NAMED_ARG = "PUSH_NAMED_ARG"
+
+	OP_FUNC_TYPE           = "FUNC_TYPE"
+	OP_FUNC_TYPE_SET_RET   = "FUNC_TYPE_SET_RET"
+	OP_FUNC_TYPE_SET_PARAM = "FUNC_TYPE_SET_PARAM"
 )

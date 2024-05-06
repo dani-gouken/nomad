@@ -1,0 +1,22 @@
+var arr_get :: ([string] list,int index) string {
+    if index > (len list -1) {
+        return "empty"
+    }
+    return list[index]
+}
+
+var data :: [string]{"dani", "is", "the", "goat"}
+
+type Person :: {
+    name :: ""
+    getName :: (string name) string {
+        return "Hello " + name;
+    }
+}
+
+Person daniel :: new Person{}
+print daniel.getName("Daniel")
+print arr_get(data, 0)
+//for int i :: 0; i < 10; i++ {
+//    print arr_get(data, i)
+//}

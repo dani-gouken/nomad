@@ -2,6 +2,7 @@ package vm
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -21,7 +22,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 	instructions := []Instruction{}
 	switch expr.Kind {
 	case parser.EXPR_KIND_NOT:
-		compiled, err := CompileExpr(expr.Exprs[0])
+		compiled, err := CompileExpr(expr.Children[0])
 		if err != nil {
 			return instructions, err
 		}
@@ -31,7 +32,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_LEN:
-		compiled, err := CompileExpr(expr.Exprs[0])
+		compiled, err := CompileExpr(expr.Children[0])
 		if err != nil {
 			return instructions, err
 		}
@@ -41,8 +42,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_ANONYMOUS:
-		for i := 0; i < len(expr.Exprs); i++ {
-			compiled, err := CompileExpr(expr.Exprs[i])
+		for i := 0; i < len(expr.Children); i++ {
+			compiled, err := CompileExpr(expr.Children[i])
 			if err != nil {
 				return instructions, err
 			}
@@ -50,7 +51,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		return instructions, nil
 	case parser.EXPR_KIND_NEGATIVE:
-		compiled, err := CompileExpr(expr.Exprs[0])
+		compiled, err := CompileExpr(expr.Children[0])
 		if err != nil {
 			return instructions, err
 		}
@@ -221,7 +222,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		return instructions, err
 	case parser.EXPR_KIND_RIGHT_INCREMENT, parser.EXPR_KIND_RIGHT_DECREMENT:
-		instructions, err := CompileExpr(expr.Exprs[0])
+		instructions, err := CompileExpr(expr.Children[0])
 		if err != nil {
 			return instructions, err
 		}
@@ -258,8 +259,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_ARRAY:
-		typeExpr := expr.Exprs[0]
-		itemsExpr := expr.Exprs[1]
+		typeExpr := expr.Children[0]
+		itemsExpr := expr.Children[1]
 		typeInstr, err := CompileExpr(typeExpr)
 		if err != nil {
 			return instructions, err
@@ -269,20 +270,20 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Code:       OP_ARR_INIT,
 			DebugToken: expr.Token,
 		})
-		for i := 0; i < len(itemsExpr.Exprs); i++ {
-			exprInstructions, err := CompileExpr(itemsExpr.Exprs[i])
+		for i := 0; i < len(itemsExpr.Children); i++ {
+			exprInstructions, err := CompileExpr(itemsExpr.Children[i])
 			if err != nil {
 				return instructions, err
 			}
 			instructions = append(instructions, exprInstructions...)
 			instructions = append(instructions, Instruction{
 				Code:       OP_ARR_PUSH,
-				DebugToken: itemsExpr.Exprs[i].Token,
+				DebugToken: itemsExpr.Children[i].Token,
 			})
 		}
 		return instructions, nil
 	case parser.EXPR_KIND_TYPE_ARRAY:
-		typeExpr := expr.Exprs[0]
+		typeExpr := expr.Children[0]
 		typeInstr, err := CompileExpr(typeExpr)
 		if err != nil {
 			return instructions, err
@@ -293,8 +294,164 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			DebugToken: expr.Token,
 		})
 		return instructions, nil
+	case parser.EXPR_KIND_FUNC_CALL:
+		if len(expr.Children) != 2 {
+			return instructions, fmt.Errorf("function expr with argument list expr expected")
+		}
+		funcExpr := expr.Children[0]
+		argListExpr := expr.Children[1]
+		funcInsts, err := CompileExpr(funcExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, funcInsts...)
+		for _, argumentExpr := range argListExpr.Children {
+			argumentInsts, err := CompileExpr(argumentExpr.Children[0])
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, argumentInsts...)
+
+			if argumentExpr.Kind == parser.EXPR_KIND_FUNC_NAMED_ARG {
+				instructions = append(instructions, Instruction{
+					Code:       OP_PUSH_NAMED_ARG,
+					DebugToken: argumentExpr.Token,
+					Arg1:       argumentExpr.Token.Content,
+				})
+			} else {
+				instructions = append(instructions, Instruction{
+					Code:       OP_PUSH_ARG,
+					DebugToken: argumentExpr.Token,
+				})
+			}
+		}
+		instructions = append(instructions, Instruction{
+			Code:       OP_CALL,
+			DebugToken: expr.Token,
+		})
+		return instructions, nil
+	case parser.EXPR_KIND_FUNC_PARAM_LIST:
+		for _, argExpr := range expr.Children {
+			argInstructions, err := CompileExpr(argExpr)
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, argInstructions...)
+		}
+		return instructions, nil
+	case parser.EXPR_KIND_FUNC_PARAM:
+		hasDefault := len(expr.Children) == 2
+		opCode := OP_FUNC_SET_PARAM
+		if hasDefault {
+			opCode = OP_FUNC_SET_PARAM_WITH_DEFAULT
+			defaultValueInstruction, err := CompileExpr(expr.Children[1])
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, defaultValueInstruction...)
+		}
+		if len(expr.Children) == 0 {
+			return instructions, fmt.Errorf("expected type and default value (optional)")
+		}
+		typeInstruction, err := CompileExpr(expr.Children[0])
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, typeInstruction...)
+
+		instructions = append(instructions, Instruction{
+			Code: opCode,
+			Arg1: expr.Token.Content,
+		})
+		return instructions, nil
+	case parser.EXPR_KIND_FUNC:
+		funcId := strconv.Itoa(rand.Int())
+		funcLabel := "__func" + "_" + funcId
+		funcDeclEndLabel := "__func" + "_" + funcId + "_decl_end"
+		instructions = append(instructions, Instruction{
+			Code:       OP_FUNC_INIT,
+			Arg1:       funcLabel,
+			DebugToken: expr.Token,
+		})
+		if len(expr.Children) != 2 {
+			return instructions, fmt.Errorf("expected parameter list and return type expression")
+		}
+		retTypeExpr := expr.Children[1]
+		retTypeExprInsts, err := CompileExpr(retTypeExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, retTypeExprInsts...)
+		instructions = append(instructions, Instruction{
+			Code:       OP_FUNC_SET_RET,
+			DebugToken: retTypeExpr.Token,
+		})
+		parameterListExpr := expr.Children[0]
+		parameterListExprInsts, err := CompileExpr(parameterListExpr)
+		if err != nil {
+			return instructions, err
+		}
+		instructions = append(instructions, parameterListExprInsts...)
+		instructions = append(instructions, Instruction{
+			Code: OP_JUMP,
+			Arg1: funcDeclEndLabel,
+		})
+		instructions = append(instructions, Instruction{
+			Code: OP_LABEL,
+			Arg1: funcLabel,
+		})
+		instructions = append(instructions, Instruction{
+			Code: OP_FUNC_BEGIN,
+		})
+		funcBodyInsts, err := CompileChunk(expr.Block)
+		if err != nil {
+			return instructions, err
+		}
+
+		instructions = append(instructions, funcBodyInsts...)
+		instructions = append(instructions, Instruction{
+			Code: OP_FUNC_END,
+		})
+		instructions = append(instructions, Instruction{
+			Code: OP_LABEL,
+			Arg1: funcDeclEndLabel,
+		})
+		return instructions, nil
+	case parser.EXPR_KIND_TYPE_FUNC:
+		instructions = append(instructions, Instruction{
+			Code:       OP_FUNC_TYPE,
+			DebugToken: expr.Token,
+		})
+		if len(expr.Children) != 2 {
+			return instructions, nil
+		}
+		paramsChildren := expr.Children[0].Children
+		returnTypeExpr := expr.Children[1]
+
+		for _, paramExpr := range paramsChildren {
+			paramInsts, err := CompileExpr(paramExpr)
+			if err != nil {
+				return instructions, err
+			}
+			instructions = append(instructions, paramInsts...)
+			instructions = append(instructions, Instruction{
+				Code: OP_FUNC_TYPE_SET_PARAM,
+			})
+		}
+
+		retInsts, err := CompileExpr(returnTypeExpr)
+		if err != nil {
+			return instructions, err
+		}
+
+		instructions = append(instructions, retInsts...)
+		instructions = append(instructions, Instruction{
+			Code: OP_FUNC_TYPE_SET_RET,
+		})
+		return instructions, nil
+
 	case parser.EXPR_KIND_ARRAY_ACCESS:
-		arrayExpr := expr.Exprs[0]
+		arrayExpr := expr.Children[0]
 		arrayInst, err := CompileExpr(arrayExpr)
 		if err != nil {
 			return instructions, err
@@ -325,7 +482,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Code:       OP_OBJ_TYPE,
 			DebugToken: expr.Token,
 		})
-		for _, v := range expr.Exprs {
+		for _, v := range expr.Children {
 			exprs, err := CompileExpr(v)
 			if err != nil {
 				return instructions, err
@@ -339,7 +496,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
-		for _, v := range expr.Exprs {
+		for _, v := range expr.Children {
 			exprs, err := CompileExpr(v)
 			if err != nil {
 				return instructions, err
@@ -348,8 +505,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		return instructions, nil
 	case parser.EXPR_KIND_TYPE_OBJ_FIELD:
-		typeExpr := expr.Exprs[0]
-		valueExpr := expr.Exprs[1]
+		typeExpr := expr.Children[0]
+		valueExpr := expr.Children[1]
 
 		exprs, err := CompileExpr(typeExpr)
 		if err != nil {
@@ -369,7 +526,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		return instructions, err
 	case parser.EXPR_KIND_OBJ_FIELD:
-		valueExpr := expr.Exprs[0]
+		valueExpr := expr.Children[0]
 
 		exprs, err := CompileExpr(valueExpr)
 		if err != nil {
@@ -383,7 +540,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		return instructions, err
 	case parser.EXPR_KIND_OBJ_ACCESS:
-		objExpr := expr.Exprs[0]
+		objExpr := expr.Children[0]
 		objInst, err := CompileExpr(objExpr)
 		if err != nil {
 			return instructions, err
@@ -396,7 +553,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		})
 		return instructions, nil
 	case parser.EXPR_KIND_OBJ_DEFAULT_ACCESS:
-		objExpr := expr.Exprs[0]
+		objExpr := expr.Children[0]
 		objInst, err := CompileExpr(objExpr)
 		if err != nil {
 			return instructions, err
@@ -425,12 +582,12 @@ func CompileComp(expr parser.Expr) ([]Instruction, error) {
 
 func CompileBinaryExpr(expr parser.Expr) ([]Instruction, error) {
 	instructions := []Instruction{}
-	compiled, err := CompileExpr(expr.Exprs[0])
+	compiled, err := CompileExpr(expr.Children[0])
 	if err != nil {
 		return instructions, err
 	}
 	instructions = append(instructions, compiled...)
-	compiled, err = CompileExpr(expr.Exprs[1])
+	compiled, err = CompileExpr(expr.Children[1])
 	if err != nil {
 		return instructions, err
 	}
@@ -573,6 +730,14 @@ func (c *Compiler) CompileStmt() error {
 		})
 		c.consume()
 		return err
+	case parser.STMT_KIND_RETURN:
+		compiled, err := CompileExpr(stmt.Expr)
+		c.instructions = append(c.instructions, compiled...)
+		c.instructions = append(c.instructions, Instruction{
+			Code: OP_RETURN,
+		})
+		c.consume()
+		return err
 	case parser.STMT_KIND_TYPE_DECLARATION:
 		typeName := stmt.Data[0].Content
 		compiled, err := CompileExpr(stmt.Expr)
@@ -630,7 +795,7 @@ func RemoveLabels(instructions []Instruction) ([]Instruction, error) {
 
 	for i := 0; i < len(instructions); i++ {
 		instruction := &instructions[i]
-		if instruction.Code == OP_JUMP || instruction.Code == OP_JUMP_NOT {
+		if instruction.Code == OP_JUMP || instruction.Code == OP_JUMP_NOT || instruction.Code == OP_FUNC_INIT {
 			instruction.Arg1 = strconv.Itoa(labels[instruction.Arg1])
 		}
 	}

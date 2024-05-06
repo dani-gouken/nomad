@@ -17,7 +17,207 @@ const (
 )
 
 func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
+	expr, err := p.parseFuncExpr()
+	if err == nil || err.ShouldCrash() {
+		return expr, err
+	}
 	return p.parseBaseExpr()
+}
+
+func (p *Parser) parseFuncExpr() (Expr, *nomadError.ParseError) {
+	beginning := p.cursor
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_BRACKET, "opening bracket")
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+
+	paramListExpr, err := p.parseFuncParamListExpr()
+
+	if err != nil {
+		p.rollback(beginning)
+		return Expr{}, err
+	}
+
+	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_BRACKET, "closing bracket")
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+
+	retTypeExpr, err := p.parseTypeExpr()
+	if err != nil {
+		p.rollback(beginning)
+		return Expr{}, err
+	}
+
+	block, err := p.parseBlock()
+	if err != nil {
+		return Expr{}, nomadError.NewParseErrorFromMessage(err.Error(), true)
+	}
+	return Expr{
+		Kind: EXPR_KIND_FUNC,
+		Children: []Expr{
+			paramListExpr,
+			retTypeExpr,
+		},
+		Block: block,
+	}, nil
+
+}
+func (p *Parser) parseFuncParamListExpr() (Expr, *nomadError.ParseError) {
+	expr := Expr{
+		Kind:     EXPR_KIND_FUNC_PARAM_LIST,
+		Children: []Expr{},
+	}
+
+	for {
+		t, _ := p.peek()
+		if t.Kind == tokenizer.TOKEN_KIND_RIGHT_BRACKET {
+			return expr, nil
+		}
+		param, err := p.parseFuncParamExpr()
+		if err != nil {
+			return expr, err
+		}
+
+		expr.Children = append(expr.Children, param)
+
+		t, _ = p.peek()
+		if t.Kind != tokenizer.TOKEN_KIND_COMMA && t.Kind != tokenizer.TOKEN_KIND_RIGHT_BRACKET {
+			return expr, nomadError.FatalParseError("expected end of parameter list or closing bracket", t)
+		}
+		if t.Kind == tokenizer.TOKEN_KIND_COMMA {
+			p.consume()
+		}
+	}
+}
+
+func (p *Parser) parseArgumentList() (Expr, *nomadError.ParseError) {
+	args := []Expr{}
+	var hasNamedArgument bool = false
+	for {
+		t, _ := p.peek()
+		argExpr, err := p.parseArgument()
+		if hasNamedArgument && argExpr.Kind == EXPR_KIND_FUNC_ARG {
+			return Expr{}, nomadError.FatalParseError("positional arguments are not allowed after named argument", argExpr.Token)
+		}
+		if argExpr.Kind == EXPR_KIND_FUNC_NAMED_ARG && !hasNamedArgument {
+			hasNamedArgument = true
+		}
+		if err != nil {
+			return Expr{
+				Kind:     EXPR_KIND_FUNC_ARG_LIST,
+				Children: args,
+			}, err
+		}
+		args = append(args, argExpr)
+		t, _ = p.peek()
+
+		if t.Kind != tokenizer.TOKEN_KIND_COMMA && t.Kind != tokenizer.TOKEN_KIND_RIGHT_BRACKET {
+			return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected end of argument list or closing bracket, got %s", t.Kind), t)
+		}
+
+		if t.Kind == tokenizer.TOKEN_KIND_COMMA {
+			p.consume()
+		}
+
+		if t.Kind == tokenizer.TOKEN_KIND_RIGHT_BRACKET {
+			return Expr{
+				Kind:     EXPR_KIND_FUNC_ARG_LIST,
+				Children: args,
+			}, nil
+		}
+	}
+}
+
+func (p *Parser) parseDirectArgument() (Expr, *nomadError.ParseError) {
+	t, _ := p.peek()
+	expr, err := p.parseExpr()
+	if err != nil {
+		return Expr{}, err
+	}
+	return Expr{
+		Kind: EXPR_KIND_FUNC_ARG,
+		Children: []Expr{
+			expr,
+		},
+		Token: t,
+	}, nil
+}
+
+func (p *Parser) parseNamedArgument() (Expr, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_ID, "parameter name")
+	if err != nil {
+		return Expr{}, err
+	}
+	err = p.expectNextNF(tokenizer.TOKEN_KIND_COLON, 1, "colon")
+	if err != nil {
+		return Expr{}, err
+	}
+
+	name, _ := p.peek()
+	p.consume()
+	p.consume()
+
+	valueExpr, err := p.parseExpr()
+	if err != nil {
+		return Expr{}, err
+	}
+	return Expr{
+		Kind: EXPR_KIND_FUNC_NAMED_ARG,
+		Children: []Expr{
+			valueExpr,
+		},
+		Token: name,
+	}, nil
+}
+
+func (p *Parser) parseArgument() (Expr, *nomadError.ParseError) {
+	argExpr, err := p.parseNamedArgument()
+	if err != nil {
+		argExpr, err = p.parseDirectArgument()
+	}
+	return argExpr, err
+}
+
+func (p *Parser) parseFuncParamExpr() (Expr, *nomadError.ParseError) {
+	typeExpr, err := p.parseTypeExpr()
+	if err != nil {
+		return Expr{}, err
+	}
+
+	err = p.expectNF(tokenizer.TOKEN_KIND_ID, "parameter name")
+	if err != nil {
+		return Expr{}, err
+	}
+
+	name, _ := p.peek()
+	p.consume()
+
+	t, _ := p.peek()
+	expr := Expr{
+		Kind:  EXPR_KIND_FUNC_PARAM,
+		Token: name,
+		Children: []Expr{
+			typeExpr,
+		},
+	}
+	if t.Kind != tokenizer.TOKEN_KIND_DB_COLON {
+		return expr, nil
+	}
+	p.consume()
+	defaultValueExpr, err := p.parseBasePrimaryExpr()
+	if err != nil {
+		return expr, nomadError.NewParseErrorFromMessage(err.Error(), true)
+	}
+
+	expr.Children = append(expr.Children, defaultValueExpr)
+	if err != nil {
+		return expr, err
+	}
+
+	return expr, nil
 }
 
 func (p *Parser) parseBaseExpr() (Expr, *nomadError.ParseError) {
@@ -44,7 +244,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  EXPR_KIND_NOT,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -58,7 +258,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  EXPR_KIND_NEGATIVE,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -72,7 +272,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  EXPR_KIND_LEN,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -87,7 +287,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  EXPR_KIND_LEFT_DECREMENT,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -101,7 +301,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  EXPR_KIND_LEFT_INCREMENT,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -129,7 +329,7 @@ func (p *Parser) parseUnaryOperatorExpr() (Expr, *nomadError.ParseError) {
 		return Expr{
 			Kind:  exprKind,
 			Token: t,
-			Exprs: []Expr{
+			Children: []Expr{
 				expr,
 			},
 		}, nil
@@ -167,7 +367,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_ADDITION,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -175,7 +375,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_SUBSTRACTION,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -183,7 +383,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_DIVISION,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -191,7 +391,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_MULTIPLICATION,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -199,7 +399,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_LESS_THAN,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -207,7 +407,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_MORE_THAN,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -215,7 +415,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_LESS_THAN_OR_EQ,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -223,7 +423,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_MORE_THAN_OR_EQ,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -231,7 +431,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_EQ,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -239,7 +439,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_AND,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -247,7 +447,7 @@ func buildBinaryOpExpr(op tokenizer.Token, lhs Expr, rhs Expr) (Expr, *nomadErro
 		return Expr{
 			Kind:  EXPR_KIND_OR,
 			Token: op,
-			Exprs: []Expr{
+			Children: []Expr{
 				lhs, rhs,
 			},
 		}, nil
@@ -318,13 +518,13 @@ func (p *Parser) parseIdExpr() (Expr, *nomadError.ParseError) {
 	return Expr{}, nomadError.FatalParseError(fmt.Sprintf("expected token identifier, %s: %s", t.Kind, t.Content), t)
 }
 
-func (p *Parser) parseBracketExpr() (Expr, *nomadError.ParseError) {
+func (p *Parser) parseBracketExpr(parseFunc func() (Expr, *nomadError.ParseError)) (Expr, *nomadError.ParseError) {
 	t, _ := p.peek()
 	if t.Kind != tokenizer.TOKEN_KIND_LEFT_BRACKET {
 		return Expr{}, nomadError.FatalParseError("expected opening bracket", t)
 	}
 	p.consume()
-	expr, err := p.parseExpr()
+	expr, err := parseFunc()
 	if err != nil {
 		return expr, err
 	}
@@ -378,7 +578,7 @@ func (p *Parser) parseArrayExpr() (Expr, *nomadError.ParseError) {
 	return Expr{
 		Kind:  EXPR_KIND_ARRAY,
 		Token: arrayTypeExpr.Token,
-		Exprs: []Expr{
+		Children: []Expr{
 			arrayTypeExpr,
 			itemsExpr,
 		},
@@ -396,16 +596,16 @@ func (p *Parser) parseExprList(endTokenKind string) (Expr, *nomadError.ParseErro
 		}
 		if token.Kind == endTokenKind {
 			return Expr{
-				Kind:  EXPR_KIND_ANONYMOUS,
-				Exprs: list,
+				Kind:     EXPR_KIND_ANONYMOUS,
+				Children: list,
 			}, nil
 		}
 		expr, err := p.parseExpr()
 
 		if err != nil {
 			return Expr{
-				Kind:  EXPR_KIND_ANONYMOUS,
-				Exprs: list,
+				Kind:     EXPR_KIND_ANONYMOUS,
+				Children: list,
 			}, err
 		}
 
@@ -424,17 +624,28 @@ func (p *Parser) parsePrimaryExpr() (Expr, *nomadError.ParseError) {
 		return primaryExpr, err
 	}
 
-	primaryExpr, _ = p.parseAccessExpression(primaryExpr)
+	primaryExpr, err = p.parseAccessExpression(primaryExpr)
+	if err != nil && err.ShouldCrash() {
+		return primaryExpr, err
+	}
 
-	return primaryExpr, err
+	return primaryExpr, nil
 }
 
 func (p *Parser) parseAccessExpression(baseExpr Expr) (Expr, *nomadError.ParseError) {
 	baseExpr, err := p.parseArrayAccess(baseExpr)
+	if err != nil && err.ShouldCrash() {
+		return baseExpr, err
+	}
 	baseExpr, err = p.parseObjectAccess(baseExpr)
-	baseExpr, err = p.parseDefaultAccess(&baseExpr)
-
-	return baseExpr, err
+	if err != nil && err.ShouldCrash() {
+		return baseExpr, err
+	}
+	baseExpr, err = p.parseFuncCall(baseExpr)
+	if err != nil && err.ShouldCrash() {
+		return baseExpr, err
+	}
+	return p.parseObjectDefaultAccess(&baseExpr)
 
 }
 
@@ -457,7 +668,7 @@ func (p *Parser) parseBasePrimaryExpr() (Expr, *nomadError.ParseError) {
 		return expr, err
 	}
 
-	expr, err = p.parseBracketExpr()
+	expr, err = p.parseBracketExpr(p.parseExpr)
 	if err == nil {
 		return expr, err
 	}
@@ -481,38 +692,11 @@ func ExprToSExpr(expr Expr) string {
 	}
 	sexpr := ""
 	sexpr += "(" + expr.Token.Content
-	for i := 0; i < len(expr.Exprs); i++ {
-		sexpr += " " + ExprToSExpr(expr.Exprs[i])
+	for i := 0; i < len(expr.Children); i++ {
+		sexpr += " " + ExprToSExpr(expr.Children[i])
 	}
 	sexpr += ")"
 	return sexpr
-}
-
-func (p *Parser) parseTypeExpr() (Expr, *nomadError.ParseError) {
-	t, _ := p.peek()
-	if t.Kind == tokenizer.TOKEN_KIND_ID {
-		p.consume()
-		return Expr{
-			Kind:  EXPR_KIND_TYPE,
-			Token: t,
-		}, nil
-	}
-	if t.Kind == tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET {
-		expr, err := p.parseArrayTypeExpr()
-		if err != nil {
-			return Expr{}, err
-		}
-		return expr, nil
-	}
-
-	if t.Kind == tokenizer.TOKEN_KIND_LEFT_CURCLY {
-		expr, err := p.parseObjectTypeExpr()
-		if err != nil {
-			return Expr{}, err
-		}
-		return expr, nil
-	}
-	return Expr{}, nomadError.NonFatalParseError("could not parse type expression", t)
 }
 
 func (p *Parser) parseObjectTypeField() (Expr, *nomadError.ParseError) {
@@ -540,7 +724,7 @@ func (p *Parser) parseObjectTypeField() (Expr, *nomadError.ParseError) {
 	return Expr{
 		Kind:  EXPR_KIND_TYPE_OBJ_FIELD,
 		Token: varName,
-		Exprs: []Expr{
+		Children: []Expr{
 			typeExpr,
 			value,
 		},
@@ -569,41 +753,9 @@ func (p *Parser) parseObjectField() (Expr, *nomadError.ParseError) {
 	return Expr{
 		Kind:  EXPR_KIND_OBJ_FIELD,
 		Token: varName,
-		Exprs: []Expr{
+		Children: []Expr{
 			value,
 		},
-	}, nil
-}
-
-func (p *Parser) parseObjectTypeExpr() (Expr, *nomadError.ParseError) {
-	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_CURCLY, "opening curly bracket ({)")
-	if err != nil {
-		return Expr{}, err
-	}
-
-	t, _ := p.peek()
-	p.consume()
-	p.cleanupNewLines()
-
-	declarations := []Expr{}
-
-	for {
-		fieldDeclr, err := p.parseObjectTypeField()
-		if err != nil {
-			break
-		}
-		declarations = append(declarations, fieldDeclr)
-		p.cleanupNewLines()
-	}
-	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_CURLY, "closing curly bracket (})")
-	p.consume()
-	if err != nil {
-		return Expr{}, err
-	}
-	return Expr{
-		Kind:  EXPR_KIND_TYPE_OBJ,
-		Exprs: declarations,
-		Token: t,
 	}, nil
 }
 
@@ -649,34 +801,10 @@ func (p *Parser) parseObjectExpr() (Expr, *nomadError.ParseError) {
 		return Expr{}, err
 	}
 	return Expr{
-		Kind:  EXPR_KIND_OBJ,
-		Exprs: declarations,
-		Token: t,
+		Kind:     EXPR_KIND_OBJ,
+		Children: declarations,
+		Token:    t,
 	}, nil
-}
-
-func (p *Parser) parseArrayTypeExpr() (Expr, *nomadError.ParseError) {
-	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_SQUARE_BRACKET, "opening bracket ([)")
-	if err != nil {
-		return Expr{}, err
-	}
-	t, _ := p.peek()
-	p.consume()
-	typeExpr, err := p.parseTypeExpr()
-	if err != nil {
-		p.spit()
-		return Expr{}, err
-	}
-	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_SQUARE_BRACKET, "closing bracket (])")
-	p.consume()
-	if err != nil {
-		return Expr{}, err
-	}
-	return p.parseAccessExpression(Expr{
-		Kind:  EXPR_KIND_TYPE_ARRAY,
-		Exprs: []Expr{typeExpr},
-		Token: t,
-	})
 }
 
 func (p *Parser) parseObjectAccess(baseExpr Expr) (Expr, *nomadError.ParseError) {
@@ -695,12 +823,40 @@ func (p *Parser) parseObjectAccess(baseExpr Expr) (Expr, *nomadError.ParseError)
 	p.consume()
 
 	return p.parseAccessExpression(Expr{
-		Kind:  EXPR_KIND_OBJ_ACCESS,
-		Exprs: []Expr{baseExpr},
-		Token: field,
+		Kind:     EXPR_KIND_OBJ_ACCESS,
+		Children: []Expr{baseExpr},
+		Token:    field,
 	})
 }
-func (p *Parser) parseDefaultAccess(baseExpr *Expr) (Expr, *nomadError.ParseError) {
+
+func (p *Parser) parseFuncCall(baseExpr Expr) (Expr, *nomadError.ParseError) {
+	begin := p.cursor
+	t, _ := p.peek()
+	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_BRACKET, "function call")
+	if err != nil {
+		return baseExpr, nil
+	}
+	p.consume()
+	argList, err := p.parseArgumentList()
+	if err != nil {
+		p.rollback(begin)
+		return baseExpr, err
+	}
+	err = p.expectF(tokenizer.TOKEN_KIND_RIGHT_BRACKET, "function call")
+	if err != nil {
+		return baseExpr, err
+	}
+	p.consume()
+
+	return Expr{
+		Kind:     EXPR_KIND_FUNC_CALL,
+		Token:    t,
+		Children: []Expr{baseExpr, argList},
+	}, nil
+
+}
+
+func (p *Parser) parseObjectDefaultAccess(baseExpr *Expr) (Expr, *nomadError.ParseError) {
 	if baseExpr.Kind != EXPR_KIND_ID {
 		return *baseExpr, nil
 	}
@@ -721,9 +877,9 @@ func (p *Parser) parseDefaultAccess(baseExpr *Expr) (Expr, *nomadError.ParseErro
 	baseExpr.Kind = EXPR_KIND_TYPE
 
 	return p.parseAccessExpression(Expr{
-		Kind:  EXPR_KIND_OBJ_DEFAULT_ACCESS,
-		Exprs: []Expr{*baseExpr},
-		Token: field,
+		Kind:     EXPR_KIND_OBJ_DEFAULT_ACCESS,
+		Children: []Expr{*baseExpr},
+		Token:    field,
 	})
 }
 
@@ -750,8 +906,8 @@ func (p *Parser) parseArrayAccess(baseExpr Expr) (Expr, *nomadError.ParseError) 
 	p.consume()
 
 	return p.parseArrayAccess(Expr{
-		Kind:  EXPR_KIND_ARRAY_ACCESS,
-		Exprs: []Expr{baseExpr},
-		Token: index,
+		Kind:     EXPR_KIND_ARRAY_ACCESS,
+		Children: []Expr{baseExpr},
+		Token:    index,
 	})
 }

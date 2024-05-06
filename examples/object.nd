@@ -1,4 +1,4 @@
-type Header  :: {
+type Header :: {
     string name :: ""
     string value :: ""
 }
@@ -13,9 +13,8 @@ type HttpStatus :: {
     int OK :: 200 
     int ValidationError :: 422 
     int Unauthorized :: 401 
-    int Redirect :: 301 
+    int Redirect :: 301
 }
-
 
 HttpResponse res :: new HttpResponse{
     status :: HttpStatus#OK
@@ -30,6 +29,7 @@ print res.status
 print res.body
 print res.headers
 print "headers"
+
 for int i :: 0; i < len res.headers; i++ {
     print res.headers[i].value
 }

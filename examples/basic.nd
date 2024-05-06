@@ -1,34 +1,14 @@
-type Person :: {
-    string  name        :: ""
-    string  surname     :: ""
-    int     age         :: 0
-
-    func    full_name   :: () string | name + " " + surname
+from http use { Server, Mux }
+type entrypoint = func ([string]) -> (int)
+entrypoint main :: ([string] args) int {
+    Server app = new Server{
+        port :: 8000,
+    }
+    app.addMux% '/host/', new Mux {
+        handle :: (Request req, ResponseWriter res) void | res.write("Hello world")
+    }
+    server.listen()
+    return 1;
 }
 
-func is_major :: (Person person) string | if person.age > 18 then 'Major' else 'Minor' 
-
-
-Person daniel :: new Person {
-    name :: "Daniel"
-    surname :: "Steph"
-}
-
-print daniel.full_name()
-print is_major(daniel)
-
-bool correct :: is_major(daniel) & age < 10
-
-func<T:int|float> array_sum :: ([T] array) T  |
-    reduce_to T, _, array, (T carry, T v)  -> carry + v
-
-
-func zero(float|int num) bool {
-    return match typeof num {
-        [int]: {
-
-        },
-        default: false
-    } 
-
-}
+main% []

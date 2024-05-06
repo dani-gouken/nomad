@@ -22,9 +22,11 @@ const (
 	TOKEN_KIND_IF                   = "TOKEN_KIND_IF"
 	TOKEN_KIND_ELSE                 = "TOKEN_KIND_ELSE"
 	TOKEN_KIND_ELIF                 = "TOKEN_KIND_ELIF"
+	TOKEN_KIND_FUNC                 = "TOKEN_KIND_FUNC"
 	TOKEN_KIND_FOR                  = "TOKEN_KIND_FOR"
 	TOKEN_KIND_NEW_LINE             = "TOKEN_KIND_NEW_LINE"
 	TOKEN_KIND_BANG                 = "TOKEN_KIND_BANG"
+	TOKEN_KIND_ARROW                = "TOKEN_KIND_ARROW"
 	TOKEN_KIND_HASH                 = "TOKEN_KIND_HASH"
 	TOKEN_KIND_TRUE                 = "TOKEN_KIND_TRUE"
 	TOKEN_KIND_FALSE                = "TOKEN_KIND_FALSE"
@@ -33,6 +35,7 @@ const (
 	TOKEN_KIND_STAR                 = "TOKEN_KIND_STAR"
 	TOKEN_KIND_BAR                  = "TOKEN_KIND_BAR"
 	TOKEN_KIND_AND                  = "TOKEN_KIND_AND"
+	TOKEN_KIND_PERCENTAGE           = "TOKEN_KIND_PERCENTAGE"
 	TOKEN_KIND_DB_PLUS              = "TOKEN_KIND_DB_PLUS"
 	TOKEN_KIND_DB_MINUS             = "TOKEN_KIND_DB_MINUS"
 	TOKEN_KIND_SEMI_COLON           = "TOKEN_KIND_SEMI_COLON"
@@ -50,6 +53,7 @@ const (
 	TOKEN_KIND_LEFT_CURCLY          = "TOKEN_KIND_LEFT_CURCLY"
 	TOKEN_KIND_RIGHT_CURLY          = "TOKEN_KIND_RIGHT_CURLY"
 	TOKEN_KIND_PRINT                = "TOKEN_KIND_PRINT"
+	TOKEN_KIND_RETURN               = "TOKEN_KIND_RETURN"
 	TOKEN_KIND_LEN                  = "TOKEN_KIND_LEN"
 	TOKEN_KIND_NEW                  = "TOKEN_KIND_NEW"
 	TOKEN_KIND_DOT                  = "TOKEN_KIND_DOT"
@@ -351,6 +355,17 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				},
 				Content: c,
 			})
+		case r == '%':
+			t.consume()
+			tokens = append(tokens, Token{
+				Kind: TOKEN_KIND_PERCENTAGE,
+				Loc: TokenLoc{
+					Start: t.col,
+					End:   t.col,
+					Line:  t.line,
+				},
+				Content: c,
+			})
 		case r == '[':
 			t.consume()
 			tokens = append(tokens, Token{
@@ -373,6 +388,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 				end = t.col
 				c += next
 				kind = TOKEN_KIND_DB_MINUS
+			}
+			if ok && next == ">" {
+				t.consume()
+				end = t.col
+				c += next
+				kind = TOKEN_KIND_ARROW
 			}
 			tokens = append(tokens, Token{
 				Kind: kind,
@@ -515,6 +536,12 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			}
 			if strings.ToLower(id) == "else" {
 				kind = TOKEN_KIND_ELSE
+			}
+			if strings.ToLower(id) == "return" {
+				kind = TOKEN_KIND_RETURN
+			}
+			if strings.ToLower(id) == "func" {
+				kind = TOKEN_KIND_FUNC
 			}
 			if strings.ToLower(id) == "elif" {
 				kind = TOKEN_KIND_ELIF

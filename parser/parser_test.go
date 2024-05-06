@@ -43,7 +43,7 @@ func TestParseNotExpr(t *testing.T) {
 				Expr: parser.Expr{
 					Kind:  parser.EXPR_KIND_NOT,
 					Token: actual[0],
-					Exprs: []parser.Expr{
+					Children: []parser.Expr{
 						{
 							Kind:  parser.EXPR_KIND_CONSTANT,
 							Token: actual[1],
@@ -90,7 +90,7 @@ func TestParseNegativeExpr(t *testing.T) {
 				Expr: parser.Expr{
 					Kind:  parser.EXPR_KIND_NEGATIVE,
 					Token: actual[0],
-					Exprs: []parser.Expr{
+					Children: []parser.Expr{
 						{
 							Kind:  parser.EXPR_KIND_CONSTANT,
 							Token: actual[1],
@@ -137,7 +137,7 @@ func TestParseIncrementExpr(t *testing.T) {
 				Expr: parser.Expr{
 					Kind:  parser.EXPR_KIND_LEFT_INCREMENT,
 					Token: actual[0],
-					Exprs: []parser.Expr{
+					Children: []parser.Expr{
 						{
 							Kind:  parser.EXPR_KIND_ID,
 							Token: actual[1],
@@ -184,7 +184,7 @@ func TestParseDecrementExpr(t *testing.T) {
 				Expr: parser.Expr{
 					Kind:  parser.EXPR_KIND_LEFT_DECREMENT,
 					Token: actual[0],
-					Exprs: []parser.Expr{
+					Children: []parser.Expr{
 						{
 							Kind:  parser.EXPR_KIND_ID,
 							Token: actual[1],
@@ -240,7 +240,7 @@ func TestParseAddition(t *testing.T) {
 				Expr: parser.Expr{
 					Kind:  parser.EXPR_KIND_ADDITION,
 					Token: actual[1],
-					Exprs: []parser.Expr{
+					Children: []parser.Expr{
 						{
 							Kind:  parser.EXPR_KIND_CONSTANT,
 							Token: actual[0],

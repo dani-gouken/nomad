@@ -34,7 +34,7 @@ func (s *Stack) Pop() (*data.RuntimeValue, error) {
 }
 func (s *Stack) Current() (*data.RuntimeValue, error) {
 	if s.pointer <= 0 {
-		return nil, errors.New("the stack is empty")
+		return nil, errors.New("stack underflow")
 	}
 	return &s.data[s.pointer-1], nil
 }
@@ -67,4 +67,7 @@ func (s *Stack) PushFloat(t types.Registrar, value float64) error {
 
 func (s *Stack) Get(pointer int) *data.RuntimeValue {
 	return &s.data[pointer]
+}
+func (s *Stack) SetPointer(pointer int) {
+	s.pointer = pointer
 }

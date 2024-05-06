@@ -44,6 +44,7 @@ func NewRegistrar() Registrar {
 		data: make(map[string]RuntimeType),
 	}
 
+	r.Add(MakeVoidType(), tokenizer.Token{})
 	r.Add(MakeIntType(), tokenizer.Token{})
 	r.Add(MakeFloatType(), tokenizer.Token{})
 	r.Add(MakeBoolType(), tokenizer.Token{})
