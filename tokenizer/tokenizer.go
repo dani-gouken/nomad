@@ -53,6 +53,8 @@ const (
 	TOKEN_KIND_LEFT_CURCLY          = "TOKEN_KIND_LEFT_CURCLY"
 	TOKEN_KIND_RIGHT_CURLY          = "TOKEN_KIND_RIGHT_CURLY"
 	TOKEN_KIND_PRINT                = "TOKEN_KIND_PRINT"
+	TOKEN_KIND_AUTO                 = "TOKEN_KIND_AUTO"
+	TOKEN_KIND_CONST                = "TOKEN_KIND_CONST"
 	TOKEN_KIND_RETURN               = "TOKEN_KIND_RETURN"
 	TOKEN_KIND_LEN                  = "TOKEN_KIND_LEN"
 	TOKEN_KIND_NEW                  = "TOKEN_KIND_NEW"
@@ -555,8 +557,17 @@ func (t *Tokenizer) Tokenize() ([]Token, error) {
 			if strings.ToLower(id) == "new" {
 				kind = TOKEN_KIND_NEW
 			}
+
 			if strings.ToLower(id) == "print" {
 				kind = TOKEN_KIND_PRINT
+			}
+
+			if strings.ToLower(id) == "auto" {
+				kind = TOKEN_KIND_AUTO
+			}
+
+			if strings.ToLower(id) == "const" {
+				kind = TOKEN_KIND_CONST
 			}
 
 			tokens = append(tokens, Token{

@@ -1,22 +1,40 @@
-var arr_get :: ([string] list,int index) string {
+auto arr_get :: func([string] list,int index) string {
     if index > (len list -1) {
         return "empty"
     }
     return list[index]
 }
 
-var data :: [string]{"dani", "is", "the", "goat"}
+auto data :: [string]{"dani", "is", "the", "goat"}
 
 type Person :: {
-    name :: ""
-    getName :: (string name) string {
+    auto name :: ""
+    auto getName :: func(string name) string {
         return "Hello " + name;
     }
 }
 
-Person daniel :: new Person{}
+auto a :: 0
+auto daniel :: new Person{}
+
 print daniel.getName("Daniel")
 print arr_get(data, 0)
-//for int i :: 0; i < 10; i++ {
-//    print arr_get(data, i)
-//}
+auto int_min :: func (int a, int b) int {
+    if a < b {
+        return a
+    }
+    return b
+}
+auto push_zero :: func([int] arr) int {
+    auto new_index :: len arr
+    arr[new_index] :: 0
+    return 0
+}
+
+auto data2 :: [int]{}
+
+for auto i :: 0; i < 100000; i++ {
+    push_zero(data2)
+}
+
+print len data2

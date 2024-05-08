@@ -5,18 +5,27 @@ import (
 	"github.com/dani-gouken/nomad/tokenizer"
 )
 
-func (p *Parser) parseTypeExpr() (Expr, *nomadError.ParseError) {
+func (p *Parser) parseTypeExpr(allowAuto bool) (Expr, *nomadError.ParseError) {
 
 	t, _ := p.peek()
 
 	if t.Kind == tokenizer.TOKEN_KIND_LEFT_BRACKET {
-		return p.parseBracketExpr(p.parseTypeExpr)
+		return p.parseBracketExpr(func() (Expr, *nomadError.ParseError) {
+			return p.parseTypeExpr(allowAuto)
+		})
 	}
 
 	if t.Kind == tokenizer.TOKEN_KIND_ID {
 		p.consume()
 		return Expr{
 			Kind:  EXPR_KIND_TYPE,
+			Token: t,
+		}, nil
+	}
+	if t.Kind == tokenizer.TOKEN_KIND_AUTO {
+		p.consume()
+		return Expr{
+			Kind:  EXPR_KIND_TYPE_AUTO,
 			Token: t,
 		}, nil
 	}
@@ -53,7 +62,7 @@ func (p *Parser) parseArrayTypeExpr() (Expr, *nomadError.ParseError) {
 	}
 	t, _ := p.peek()
 	p.consume()
-	typeExpr, err := p.parseTypeExpr()
+	typeExpr, err := p.parseTypeExpr(false)
 	if err != nil {
 		p.spit()
 		return Expr{}, err
@@ -101,7 +110,7 @@ func (p *Parser) parseFuncTypeExpr() (Expr, *nomadError.ParseError) {
 	}
 	p.consume()
 
-	returnType, err := p.parseTypeExpr()
+	returnType, err := p.parseTypeExpr(false)
 	if err != nil {
 		return funcExpr, err
 	}
@@ -159,7 +168,7 @@ func (p *Parser) parseTypeExprList(endTokenKind string) (Expr, *nomadError.Parse
 				Children: list,
 			}, nil
 		}
-		expr, err := p.parseTypeExpr()
+		expr, err := p.parseTypeExpr(false)
 
 		if err != nil {
 			return Expr{

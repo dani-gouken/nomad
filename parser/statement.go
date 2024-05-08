@@ -18,6 +18,7 @@ const (
 	STMT_KIND_ELIF             = "ELIF"
 	STMT_KIND_SCOPE            = "SCOPE"
 	STMT_KIND_ASSIGNMENT       = "ASSIGNMENT"
+	STMT_KIND_ARR_ASSIGNMENT   = "ARR_ASSIGNMENT"
 	STMT_KIND_RETURN           = "RETURN"
 )
 
@@ -169,6 +170,7 @@ func (p *Parser) parseFlowControlStatement(tokenKind string, statementKind strin
 }
 
 func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
+	t, _ := p.peek()
 	err := p.expectNF(tokenizer.TOKEN_KIND_FOR, "for (keyword)")
 	if err != nil {
 		return nil, err
@@ -178,7 +180,7 @@ func (p *Parser) parseForLoop() ([]*Stmt, *nomadError.ParseError) {
 	if err != nil {
 		initStmt, err = p.parseAssignment()
 		if err != nil {
-			return initStmt, err
+			return initStmt, nomadError.FatalParseError("for loop init expr should be an assignment or a variable declaration", t)
 		}
 	}
 	testExpr, err := p.parseExpr()
@@ -282,7 +284,7 @@ func (p *Parser) parseAssignment() ([]*Stmt, *nomadError.ParseError) {
 func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	pos := p.cursor
 	t, _ := p.peek()
-	typeExpr, err := p.parseTypeExpr()
+	typeExpr, err := p.parseTypeExpr(true)
 	if err != nil {
 		return []*Stmt{}, err
 	}
@@ -339,7 +341,7 @@ func (p *Parser) parseTypeDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	p.consume()
 	p.consume() // consume equal sign
 
-	value, err := p.parseTypeExpr()
+	value, err := p.parseTypeExpr(true)
 
 	if err != nil {
 		return []*Stmt{}, err

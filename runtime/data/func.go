@@ -7,6 +7,7 @@ import (
 )
 
 type Parameter struct {
+	Name         string
 	DefaultValue RuntimeValue
 	HasDefault   bool
 	RuntimeType  types.RuntimeType
@@ -14,7 +15,8 @@ type Parameter struct {
 
 type FuncSignature struct {
 	ReturnType types.RuntimeType
-	Parameters map[string]Parameter
+	Parameters []Parameter
+	names      map[string]int
 }
 
 type RuntimeFunc struct {
@@ -34,15 +36,17 @@ func (s *FuncSignature) AsType() *types.FuncType {
 }
 
 func (f *RuntimeFunc) AddParam(name string, t types.RuntimeType, defaultValue RuntimeValue) error {
-	_, ok := f.Signature.Parameters[name]
+	_, ok := f.Signature.names[name]
 	if ok {
 		return fmt.Errorf("cannot redeclare parameter [%s]", name)
 	}
-	f.Signature.Parameters[name] = Parameter{
+	f.Signature.names[name] = len(f.Signature.names)
+	f.Signature.Parameters = append(f.Signature.Parameters, Parameter{
 		HasDefault:   defaultValue != RuntimeValue{},
 		DefaultValue: defaultValue,
+		Name:         name,
 		RuntimeType:  t,
-	}
+	})
 	return nil
 }
 
@@ -56,7 +60,8 @@ func NewRuntimeFunc(t *types.Registrar, beginPtr int) *RuntimeFunc {
 		Tag:   "closure",
 		Signature: FuncSignature{
 			ReturnType: t.GetOrPanic("void"),
-			Parameters: make(map[string]Parameter),
+			Parameters: []Parameter{},
+			names:      make(map[string]int),
 		},
 	}
 }

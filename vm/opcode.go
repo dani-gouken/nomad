@@ -8,6 +8,7 @@ const (
 	OP_POP_CONST             = "POP_CONST"
 	OP_LOAD_VAR              = "LOAD_VAR"
 	OP_LOAD_TYPE             = "LOAD_TYPE"
+	OP_LOAD_TYPE_INFER       = "LOAD_TYPE_INFER"
 	CALL                     = "CALL"
 	OP_PUSH_CONST            = "PUSH_CONST"
 	OP_PUSH_SCOPE            = "PUSH_SCOPE"

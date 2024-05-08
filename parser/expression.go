@@ -25,8 +25,12 @@ func (p *Parser) parseExpr() (Expr, *nomadError.ParseError) {
 }
 
 func (p *Parser) parseFuncExpr() (Expr, *nomadError.ParseError) {
-	beginning := p.cursor
-	err := p.expectNF(tokenizer.TOKEN_KIND_LEFT_BRACKET, "opening bracket")
+	err := p.expectNF(tokenizer.TOKEN_KIND_FUNC, "func")
+	if err != nil {
+		return Expr{}, err
+	}
+	p.consume()
+	err = p.expectF(tokenizer.TOKEN_KIND_LEFT_BRACKET, "opening bracket")
 	if err != nil {
 		return Expr{}, err
 	}
@@ -35,7 +39,6 @@ func (p *Parser) parseFuncExpr() (Expr, *nomadError.ParseError) {
 	paramListExpr, err := p.parseFuncParamListExpr()
 
 	if err != nil {
-		p.rollback(beginning)
 		return Expr{}, err
 	}
 
@@ -45,9 +48,8 @@ func (p *Parser) parseFuncExpr() (Expr, *nomadError.ParseError) {
 	}
 	p.consume()
 
-	retTypeExpr, err := p.parseTypeExpr()
+	retTypeExpr, err := p.parseTypeExpr(false)
 	if err != nil {
-		p.rollback(beginning)
 		return Expr{}, err
 	}
 
@@ -182,7 +184,7 @@ func (p *Parser) parseArgument() (Expr, *nomadError.ParseError) {
 }
 
 func (p *Parser) parseFuncParamExpr() (Expr, *nomadError.ParseError) {
-	typeExpr, err := p.parseTypeExpr()
+	typeExpr, err := p.parseTypeExpr(false)
 	if err != nil {
 		return Expr{}, err
 	}
@@ -546,7 +548,7 @@ func (p *Parser) parseArrayExpr() (Expr, *nomadError.ParseError) {
 		return Expr{}, err
 	}
 	p.consume()
-	arrayTypeExpr, err := p.parseTypeExpr()
+	arrayTypeExpr, err := p.parseTypeExpr(false)
 	if err != nil {
 		p.rollback(pos)
 		return Expr{}, err
@@ -701,7 +703,7 @@ func ExprToSExpr(expr Expr) string {
 
 func (p *Parser) parseObjectTypeField() (Expr, *nomadError.ParseError) {
 	pos := p.cursor
-	typeExpr, err := p.parseTypeExpr()
+	typeExpr, err := p.parseTypeExpr(true)
 	if err != nil {
 		return Expr{}, err
 	}

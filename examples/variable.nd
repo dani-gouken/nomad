@@ -9,5 +9,11 @@ result :: ((a / b) + 2.0)
 print result
 print result = 12.0
 
+auto c :: 1
+print c
+
+auto d :: "foo bar"
+print d
+
 string name :: "nghokeng daniel"
 print name

@@ -252,6 +252,12 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		}), nil
+	case parser.EXPR_KIND_TYPE_AUTO:
+		return append(instructions, Instruction{
+			Code:       OP_LOAD_TYPE_INFER,
+			Arg1:       expr.Token.Content,
+			DebugToken: expr.Token,
+		}), nil
 	case parser.EXPR_KIND_TYPE:
 		return append(instructions, Instruction{
 			Code:       OP_LOAD_TYPE,

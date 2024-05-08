@@ -327,6 +327,8 @@ loop:
 			vm.PushPositionalArgument(*value)
 		case OP_FUNC_BEGIN:
 		case OP_FUNC_END:
+			vm.ClearArguments()
+			vm.env.PopScope()
 		case OP_RETURN:
 			returnedValue, err := vm.stack.Pop()
 			if err != nil {
@@ -336,7 +338,6 @@ loop:
 			vm.stack.SetPointer(vm.sp)
 			i = vm.fp
 			vm.stack.Push(*returnedValue)
-			vm.env.PopScope()
 		case OP_CALL:
 			value, err := vm.stack.Pop()
 			if err != nil {
@@ -354,8 +355,8 @@ loop:
 			}
 			// we move to the func begining
 			vm.env.PushScope()
-			for pName, pData := range f.Signature.Parameters {
-				value, err := vm.PopNamedArgument(pName)
+			for _, pData := range f.Signature.Parameters {
+				value, err := vm.PopNamedArgument(pData.Name)
 				if err != nil {
 					value, err = vm.PopPositionalArgument()
 					if err != nil {
@@ -367,13 +368,13 @@ loop:
 						}
 					}
 				}
-				err = value.RuntimeType.Match(pData.RuntimeType)
+				err = pData.RuntimeType.Match(value.RuntimeType)
 				if err != nil {
 					vm.env.PopScope()
 					return nomadError.RuntimeError(
-						fmt.Sprintf("failed to call %s, type mismatch for parameter %s %s", f.Tag, pName, err.Error()), instruction.DebugToken)
+						fmt.Sprintf("failed to call %s, type mismatch for parameter \"%s\". %s", f.Tag, pData.Name, err.Error()), instruction.DebugToken)
 				}
-				vm.Env().DeclareVariable(pName, &value, pData.RuntimeType)
+				vm.Env().DeclareVariable(pData.Name, &value, pData.RuntimeType)
 			}
 			vm.fp = i
 			vm.sp = vm.stack.pointer
@@ -405,8 +406,15 @@ loop:
 			}
 			variable.Value = value.Value
 		case OP_DECL_VAR:
-			value, err := vm.stack.Pop()
 			t, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
+
+			value, err := vm.stack.Pop()
+			if err != nil {
+				return err
+			}
 
 			tScalar, err := types.ToScalarType(t.RuntimeType)
 			if err != nil {
@@ -533,6 +541,12 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			vm.stack.PushType(vm.types, value)
+		case OP_LOAD_TYPE_INFER:
+			value, err := vm.stack.Current()
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+			vm.stack.PushType(vm.types, value.RuntimeType)
 		case OP_DECL_TYPE:
 			value, err := vm.stack.Pop()
 			if err != nil {
