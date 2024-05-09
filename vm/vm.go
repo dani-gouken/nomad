@@ -155,20 +155,18 @@ loop:
 				vObj := value.Value.(*data.RuntimeObject)
 				fmt.Print(value.RuntimeType.GetName())
 				fmt.Print("{")
-				lastKey := ""
-
-				for k1 := range vObj.GetFields() {
-					lastKey = k1
-				}
+				i := 0
+				objLen := len(vObj.GetFields())
 				for k, v := range vObj.GetFields() {
 					fmt.Print(v.RuntimeType.GetName())
 					fmt.Print(" ")
 					fmt.Print(k)
-					fmt.Print(" ")
+					fmt.Print(" :: ")
 					fmt.Print(v.Value)
-					if k != lastKey {
+					if i < (objLen - 1) {
 						fmt.Print(", ")
 					}
+					i++
 				}
 				fmt.Print("}")
 				fmt.Print("\n")
@@ -730,6 +728,11 @@ loop:
 
 			fieldType := fieldTypeValue.Value.(types.RuntimeType)
 
+			err = fieldType.Match(fieldDefaultValue.RuntimeType)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
+
 			object, err := vm.stack().Current()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
@@ -747,7 +750,11 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			objectType.AddField(instruction.Arg1, fieldType, *fieldDefaultValue)
+
+			err = objectType.AddField(instruction.Arg1, fieldType, *fieldDefaultValue)
+			if err != nil {
+				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
+			}
 		case OP_OBJ_SET_FIELD:
 			value, err := vm.stack().Pop()
 			if err != nil {
@@ -770,7 +777,6 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-
 			err = fieldType.Match(value.RuntimeType)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)

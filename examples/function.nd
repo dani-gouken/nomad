@@ -1,13 +1,13 @@
 type Equation :: {
-    float a :: 0
-    float b :: 0
-    float c :: 0
+    float a :: 0.0
+    float b :: 0.0
+    float c :: 0.0
 }
 
 type Solution :: {
-    float a :: 0
-    float b :: 0
-    float valid :: false
+    float s1 :: 0.0
+    float s2 :: 0.0
+    bool valid :: false
 }
 
 auto min :: func(float a, float b) bool {
@@ -39,10 +39,10 @@ auto sqrt :: func(float n) float {
 
     for int i :: 0 ; i < 100 ; i++ {
         mid :: (lo+hi)/2.0;
-        if(mid*mid = n) {
+        if(mid * mid = n) {
             return mid
         }
-        if(mid*mid > n) {
+        if(mid * mid > n) {
             hi :: mid
         } else {
             lo :: mid
@@ -52,18 +52,39 @@ auto sqrt :: func(float n) float {
     return mid
 }
 
-print sqrt(n: 4.0)
+func(float, int) -> (float)
+pow :: func(float a, int n) float {
+    for int i :: 0; i < (n - 1); i++ {
+        a :: a + a
+    }
+    return a
+}
 
-auto resoudre_2nd_eq :: func(Equation eq) Solution {
-    auto delta ::  eq.b * eq.b - (4 * a * c)
-    if delta < 0 {
+auto solve_2nd :: func(Equation eq) Solution {
+    auto delta ::  pow(eq.b, 2) - (4.0 * eq.a * eq.c)
+
+    if delta < 0.0 {
         return new Solution {
             valid :: false
         }
     }
 
-    if delta > 0 {
-
+    if delta > 0.0 {
+        return new Solution {
+            valid :: true,
+            s1 :: (-eq.b - sqrt(delta))/(2.0 * eq.a)
+            s2 :: (-eq.b + sqrt(delta))/(2.0 * eq.a)
+        }
     }
-    
+
+    return new Solution {
+        valid :: true,
+        s1 :: (-eq.b)/(2.0 * eq.a)
+    }
 } 
+
+print solve_2nd(new Equation {
+    a :: 1.0,
+    b :: 0.0,
+    c :: -16.0,
+})

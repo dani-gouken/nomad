@@ -61,7 +61,7 @@ func (s *Stack) PushInt(t types.Registrar, value int64) error {
 func (s *Stack) PushFloat(t types.Registrar, value float64) error {
 	return s.Push(data.RuntimeValue{
 		Value:       value,
-		RuntimeType: t.GetOrPanic(types.BOOL_TYPE),
+		RuntimeType: t.GetOrPanic(types.FLOAT_TYPE),
 	})
 }
 
