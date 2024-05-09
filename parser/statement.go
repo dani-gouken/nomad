@@ -312,8 +312,9 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 		Expr: Expr{
 			Kind:  EXPR_KIND_ANONYMOUS,
 			Token: t, Children: []Expr{
-				typeExpr,
+				// value before type, in case we need to infer the type
 				value,
+				typeExpr,
 			},
 		},
 	}

@@ -99,6 +99,7 @@ func (p *Parser) parseArgumentList() (Expr, *nomadError.ParseError) {
 	args := []Expr{}
 	var hasNamedArgument bool = false
 	for {
+		p.cleanupNewLines()
 		t, _ := p.peek()
 		argExpr, err := p.parseArgument()
 		if hasNamedArgument && argExpr.Kind == EXPR_KIND_FUNC_ARG {
@@ -123,7 +124,7 @@ func (p *Parser) parseArgumentList() (Expr, *nomadError.ParseError) {
 		if t.Kind == tokenizer.TOKEN_KIND_COMMA {
 			p.consume()
 		}
-
+		p.cleanupNewLines()
 		if t.Kind == tokenizer.TOKEN_KIND_RIGHT_BRACKET {
 			return Expr{
 				Kind:     EXPR_KIND_FUNC_ARG_LIST,
@@ -176,6 +177,7 @@ func (p *Parser) parseNamedArgument() (Expr, *nomadError.ParseError) {
 }
 
 func (p *Parser) parseArgument() (Expr, *nomadError.ParseError) {
+	p.cleanupNewLines()
 	argExpr, err := p.parseNamedArgument()
 	if err != nil {
 		argExpr, err = p.parseDirectArgument()
@@ -850,11 +852,11 @@ func (p *Parser) parseFuncCall(baseExpr Expr) (Expr, *nomadError.ParseError) {
 	}
 	p.consume()
 
-	return Expr{
+	return p.parseAccessExpression(Expr{
 		Kind:     EXPR_KIND_FUNC_CALL,
 		Token:    t,
 		Children: []Expr{baseExpr, argList},
-	}, nil
+	})
 
 }
 

@@ -1,40 +1,69 @@
-auto arr_get :: func([string] list,int index) string {
-    if index > (len list -1) {
-        return "empty"
-    }
-    return list[index]
+type Equation :: {
+    float a :: 0
+    float b :: 0
+    float c :: 0
 }
 
-auto data :: [string]{"dani", "is", "the", "goat"}
-
-type Person :: {
-    auto name :: ""
-    auto getName :: func(string name) string {
-        return "Hello " + name;
-    }
+type Solution :: {
+    float a :: 0
+    float b :: 0
+    float valid :: false
 }
 
-auto a :: 0
-auto daniel :: new Person{}
-
-print daniel.getName("Daniel")
-print arr_get(data, 0)
-auto int_min :: func (int a, int b) int {
-    if a < b {
+auto min :: func(float a, float b) bool {
+    if (a < b) {
         return a
     }
     return b
 }
-auto push_zero :: func([int] arr) int {
-    auto new_index :: len arr
-    arr[new_index] :: 0
-    return 0
+
+auto max :: func(float a, float b) bool {
+    if (a > b) {
+        return a
+    }
+    return b
 }
 
-auto data2 :: [int]{}
+auto sqrt :: func(float n) float {
+    auto lo  :: min(1.0,n)
+    auto hi  :: max(1.0, n)
+    auto mid :: 0.0
+    
+    for float j ::  0.0; (j < n); j :: 100.0 * lo * lo {
+        lo :: lo * 10.0
+    }
 
-for auto i :: 0; i < 100000; i++ {
-    push_zero(data2)
+    for float k :: 0.0; (k > n); k :: 0.0001 * hi * hi {
+        hi :: hi * 0.001
+    }
+
+    for int i :: 0 ; i < 100 ; i++ {
+        mid :: (lo+hi)/2.0;
+        if(mid*mid = n) {
+            return mid
+        }
+        if(mid*mid > n) {
+            hi :: mid
+        } else {
+            lo :: mid
+        }
+    }
+
+    return mid
 }
 
-print len data2
+print sqrt(n: 4.0)
+
+auto resoudre_2nd_eq :: func(Equation eq) Solution {
+    auto delta ::  eq.b * eq.b - (4 * a * c)
+    if delta < 0 {
+        return new Solution {
+            valid :: false
+        }
+    }
+
+    if delta > 0 {
+
+    }
+    
+} 

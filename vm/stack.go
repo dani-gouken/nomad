@@ -68,6 +68,10 @@ func (s *Stack) PushFloat(t types.Registrar, value float64) error {
 func (s *Stack) Get(pointer int) *data.RuntimeValue {
 	return &s.data[pointer]
 }
-func (s *Stack) SetPointer(pointer int) {
-	s.pointer = pointer
+
+func NewStack() *Stack {
+	return &Stack{
+		data:    [16384]data.RuntimeValue{},
+		pointer: 1,
+	}
 }

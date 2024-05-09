@@ -16,13 +16,19 @@ const (
 )
 
 type Vm struct {
-	fp            int
-	sp            int
-	stack         Stack
+	callStack     *CallStack
 	env           Environment
 	arguments     []data.RuntimeValue
 	namedArgument map[string]data.RuntimeValue
 	types         types.Registrar
+}
+
+func (vm *Vm) stack() *Stack {
+	currentCallStack, err := vm.callStack.Current()
+	if err != nil {
+		panic(err)
+	}
+	return currentCallStack.stack
 }
 
 func (vm *Vm) PushPositionalArgument(arg data.RuntimeValue) {
@@ -78,20 +84,18 @@ type Instruction struct {
 
 func New() *Vm {
 	return &Vm{
-		stack: Stack{
-			pointer: 1,
-		},
 		env:           NewEnvironment(),
 		types:         types.NewRegistrar(),
 		namedArgument: make(map[string]data.RuntimeValue),
 		arguments:     []data.RuntimeValue{},
+		callStack:     NewCallStack(),
 	}
 }
 
 func (vm *Vm) pushConst(runtimeType string, value string) error {
 	switch runtimeType {
 	case types.BOOL_TYPE:
-		return vm.stack.Push(data.RuntimeValue{
+		return vm.stack().Push(data.RuntimeValue{
 			Value:       value == OP_CONST_TRUE,
 			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
@@ -100,7 +104,7 @@ func (vm *Vm) pushConst(runtimeType string, value string) error {
 		if err != nil {
 			return err
 		}
-		return vm.stack.Push(data.RuntimeValue{
+		return vm.stack().Push(data.RuntimeValue{
 			Value:       int64(intVal),
 			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
@@ -109,12 +113,12 @@ func (vm *Vm) pushConst(runtimeType string, value string) error {
 		if err != nil {
 			return err
 		}
-		return vm.stack.Push(data.RuntimeValue{
+		return vm.stack().Push(data.RuntimeValue{
 			Value:       float64(floatVal),
 			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
 	case types.STRING_TYPE:
-		return vm.stack.Push(data.RuntimeValue{
+		return vm.stack().Push(data.RuntimeValue{
 			Value:       value,
 			RuntimeType: vm.types.GetOrPanic(runtimeType),
 		})
@@ -140,7 +144,7 @@ loop:
 				return err
 			}
 		case OP_DEBUG_PRINT:
-			value, err := vm.stack.Current()
+			value, err := vm.stack().Current()
 			if err != nil {
 				return err
 			}
@@ -170,7 +174,7 @@ loop:
 				fmt.Print("\n")
 			}
 		case OP_NOT:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -182,7 +186,7 @@ loop:
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool(vm.types, !boolValue)
+			vm.stack().PushBool(vm.types, !boolValue)
 		case OP_JUMP:
 			addr, err := strconv.Atoi(instruction.Arg1)
 			if err != nil {
@@ -190,7 +194,7 @@ loop:
 			}
 			i = addr - 1
 		case OP_JUMP_NOT, OP_JUMP_IF:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -211,22 +215,22 @@ loop:
 			}
 
 		case OP_NEGATIVE:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
 			switch value.RuntimeType.GetName() {
 			case types.INT_TYPE:
 				intValue := value.Value.(int64)
-				vm.stack.PushInt(vm.types, -intValue)
+				vm.stack().PushInt(vm.types, -intValue)
 			case types.FLOAT_TYPE:
 				floatValue := value.Value.(float64)
-				vm.stack.PushFloat(vm.types, -floatValue)
+				vm.stack().PushFloat(vm.types, -floatValue)
 			default:
 				return nomadError.RuntimeErrorUnsupportedOperand("negative (-)", value.RuntimeType.GetName(), instruction.DebugToken)
 			}
 		case OP_LEN:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -238,42 +242,42 @@ loop:
 			}
 			if arrayTypeErr == nil {
 				arrValue := value.Value.(data.RuntimeArray)
-				vm.stack.PushInt(vm.types, int64(len(arrValue.Values)))
+				vm.stack().PushInt(vm.types, int64(len(arrValue.Values)))
 			}
 			if scalarTypeErr == nil {
 				stringValue := value.Value.(string)
-				vm.stack.PushInt(vm.types, int64(len(stringValue)))
+				vm.stack().PushInt(vm.types, int64(len(stringValue)))
 			}
 		case OP_EQ:
-			rhs, err := vm.stack.Pop()
+			rhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			lhs, err := vm.stack.Pop()
+			lhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool(vm.types, rhs.Value == lhs.Value)
+			vm.stack().PushBool(vm.types, rhs.Value == lhs.Value)
 		case OP_EQ_2:
-			rhs, err := vm.stack.Pop()
+			rhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			lhs1, err := vm.stack.Pop()
+			lhs1, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			lhs2, err := vm.stack.Pop()
+			lhs2, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			vm.stack.PushBool(vm.types, (rhs.Value == lhs1.Value) || (rhs.Value == lhs2.Value))
+			vm.stack().PushBool(vm.types, (rhs.Value == lhs1.Value) || (rhs.Value == lhs2.Value))
 		case OP_ADD, OP_SUB, OP_MULT, OP_DIV, OP_CMP:
-			rhs, err := vm.stack.Pop()
+			rhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			lhs, err := vm.stack.Pop()
+			lhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -288,13 +292,13 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.Push(*result)
+			vm.stack().Push(*result)
 		case OP_OR, OP_AND:
-			rhs, err := vm.stack.Pop()
+			rhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			lhs, err := vm.stack.Pop()
+			lhs, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -316,30 +320,32 @@ loop:
 			} else {
 				res = lhsValue && rhsValue
 			}
-			vm.stack.PushBool(vm.types, res)
+			vm.stack().PushBool(vm.types, res)
 		case OP_PUSH_SCOPE:
 			vm.Env().PushScope()
 		case OP_PUSH_ARG:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
 			vm.PushPositionalArgument(*value)
 		case OP_FUNC_BEGIN:
 		case OP_FUNC_END:
-			vm.ClearArguments()
 			vm.env.PopScope()
 		case OP_RETURN:
-			returnedValue, err := vm.stack.Pop()
+			returnedValue, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-
-			vm.stack.SetPointer(vm.sp)
-			i = vm.fp
-			vm.stack.Push(*returnedValue)
+			f, err := vm.callStack.Current()
+			if err != nil {
+				panic(err)
+			}
+			i = f.returnAddr
+			vm.callStack.Pop()
+			vm.stack().Push(*returnedValue)
 		case OP_CALL:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -348,11 +354,11 @@ loop:
 				return err
 			}
 			f := value.Value.(*data.RuntimeFunc)
-			if len(f.Signature.Parameters) < vm.ArgumentCount() {
-				return nomadError.RuntimeError(fmt.Sprintf(
-					"failed to call function %s :: %s, too much argument provided, %d declared, %d passed",
-					f.Tag, f.Signature.AsType().GetName(), len(f.Signature.Parameters), vm.ArgumentCount()), instruction.DebugToken)
-			}
+			// if len(f.Signature.Parameters) < vm.ArgumentCount() {
+			// 	return nomadError.RuntimeError(fmt.Sprintf(
+			// 		"failed to call function %s :: %s, too much argument provided, %d declared, %d passed",
+			// 		f.Tag, f.Signature.AsType().GetName(), len(f.Signature.Parameters), vm.ArgumentCount()), instruction.DebugToken)
+			// }
 			// we move to the func begining
 			vm.env.PushScope()
 			for _, pData := range f.Signature.Parameters {
@@ -376,11 +382,10 @@ loop:
 				}
 				vm.Env().DeclareVariable(pData.Name, &value, pData.RuntimeType)
 			}
-			vm.fp = i
-			vm.sp = vm.stack.pointer
+			vm.callStack.Push(NewFrame(i, f, instruction.DebugToken))
 			i = f.Begin - 1
 		case OP_PUSH_NAMED_ARG:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -390,7 +395,7 @@ loop:
 		case OP_POP_SCOPE:
 			vm.Env().PopScope()
 		case OP_SET_VAR:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
@@ -406,12 +411,12 @@ loop:
 			}
 			variable.Value = value.Value
 		case OP_DECL_VAR:
-			t, err := vm.stack.Pop()
+			t, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
 
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -445,7 +450,7 @@ loop:
 			}
 
 		case OP_ARR_INIT:
-			t, err := vm.stack.Pop()
+			t, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -465,9 +470,9 @@ loop:
 				Value:       data.RuntimeArray{},
 				RuntimeType: arrayType,
 			}
-			vm.stack.Push(value)
+			vm.stack().Push(value)
 		case OP_ARR_TYPE:
-			t, err := vm.stack.Pop()
+			t, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -483,14 +488,14 @@ loop:
 
 			arraySubType := t.Value.(types.RuntimeType)
 			arrayType := types.NewArrayType(arraySubType)
-			vm.stack.PushType(vm.types, arrayType)
+			vm.stack().PushType(vm.types, arrayType)
 
 		case OP_ARR_PUSH:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
-			array, err := vm.stack.Current()
+			array, err := vm.stack().Current()
 			if err != nil {
 				return err
 			}
@@ -506,8 +511,8 @@ loop:
 			runtimeArray.Values = append(runtimeArray.Values, *value)
 			array.Value = runtimeArray
 		case OP_ARR_LOAD:
-			index, err := vm.stack.Pop()
-			array, err := vm.stack.Pop()
+			index, err := vm.stack().Pop()
+			array, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -526,29 +531,29 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError("index should be an integer", instruction.DebugToken)
 			}
-			vm.stack.Push(runtimeArray.Values[i])
+			vm.stack().Push(runtimeArray.Values[i])
 		case OP_POP_CONST:
-			vm.stack.Pop()
+			vm.stack().Pop()
 		case OP_LOAD_VAR:
 			value, err := vm.Env().GetVariable(instruction.Arg1)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.Push(*value)
+			vm.stack().Push(*value)
 		case OP_LOAD_TYPE:
 			value, err := vm.types.Get(instruction.Arg1)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.PushType(vm.types, value)
+			vm.stack().PushType(vm.types, value)
 		case OP_LOAD_TYPE_INFER:
-			value, err := vm.stack.Current()
+			value, err := vm.stack().Current()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.PushType(vm.types, value.RuntimeType)
+			vm.stack().PushType(vm.types, value.RuntimeType)
 		case OP_DECL_TYPE:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -566,12 +571,12 @@ loop:
 			}
 		case OP_OBJ_TYPE:
 			obj := types.NewObjectType()
-			vm.stack.PushType(vm.types, obj)
+			vm.stack().PushType(vm.types, obj)
 		case OP_FUNC_TYPE:
 			obj := types.NewFuncType()
-			vm.stack.PushType(vm.types, obj)
+			vm.stack().PushType(vm.types, obj)
 		case OP_FUNC_TYPE_SET_PARAM, OP_FUNC_TYPE_SET_RET:
-			t, err := vm.stack.Pop()
+			t, err := vm.stack().Pop()
 			if err != nil {
 				return err
 			}
@@ -582,7 +587,7 @@ loop:
 
 			tType := t.Value.(types.RuntimeType)
 
-			f, err := vm.stack.Current()
+			f, err := vm.stack().Current()
 			if err != nil {
 				return err
 			}
@@ -624,7 +629,7 @@ loop:
 				obj.SetField(k, vValue)
 			}
 
-			vm.stack.Push(data.RuntimeValue{
+			vm.stack().Push(data.RuntimeValue{
 				RuntimeType: t,
 				Value:       obj,
 			})
@@ -635,12 +640,12 @@ loop:
 			}
 
 			f := data.NewRuntimeFunc(&vm.types, pointer)
-			vm.stack.Push(data.RuntimeValue{
+			vm.stack().Push(data.RuntimeValue{
 				RuntimeType: f.Signature.AsType(),
 				Value:       f,
 			})
 		case OP_FUNC_SET_RET:
-			returnType, err := vm.stack.Pop()
+			returnType, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -651,7 +656,7 @@ loop:
 			}
 			returnTypeValue := returnType.Value.(types.RuntimeType)
 
-			f, err := vm.stack.Pop()
+			f, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -663,13 +668,13 @@ loop:
 
 			fValue := f.Value.(*data.RuntimeFunc)
 			fValue.SetRet(returnTypeValue)
-			vm.stack.Push(data.RuntimeValue{
+			vm.stack().Push(data.RuntimeValue{
 				RuntimeType: fValue.Signature.AsType(),
 				Value:       fValue,
 			})
 		case OP_FUNC_SET_PARAM, OP_FUNC_SET_PARAM_WITH_DEFAULT:
 			paramName := instruction.Arg1
-			paramType, err := vm.stack.Pop()
+			paramType, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -682,13 +687,13 @@ loop:
 
 			defaultValue := data.RuntimeValue{}
 			if instruction.Code == OP_FUNC_SET_PARAM_WITH_DEFAULT {
-				defaultValuePtr, err := vm.stack.Pop()
+				defaultValuePtr, err := vm.stack().Pop()
 				if err != nil {
 					return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 				}
 				defaultValue = *defaultValuePtr
 			}
-			f, err := vm.stack.Pop()
+			f, err := vm.stack().Pop()
 
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
@@ -703,17 +708,17 @@ loop:
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
-			vm.stack.Push(data.RuntimeValue{
+			vm.stack().Push(data.RuntimeValue{
 				RuntimeType: fValue.Signature.AsType(),
 				Value:       fValue,
 			})
 		case OP_OBJ_TYPE_SET_FIELD:
-			fieldDefaultValue, err := vm.stack.Pop()
+			fieldDefaultValue, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 
-			fieldTypeValue, err := vm.stack.Pop()
+			fieldTypeValue, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -725,7 +730,7 @@ loop:
 
 			fieldType := fieldTypeValue.Value.(types.RuntimeType)
 
-			object, err := vm.stack.Current()
+			object, err := vm.stack().Current()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -744,13 +749,13 @@ loop:
 			}
 			objectType.AddField(instruction.Arg1, fieldType, *fieldDefaultValue)
 		case OP_OBJ_SET_FIELD:
-			value, err := vm.stack.Pop()
+			value, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			field := instruction.Arg1
 
-			objectValue, err := vm.stack.Current()
+			objectValue, err := vm.stack().Current()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -772,7 +777,7 @@ loop:
 			}
 			object.SetField(field, *value)
 		case OP_OBJ_LOAD:
-			objectValue, err := vm.stack.Pop()
+			objectValue, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -789,9 +794,9 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 
-			vm.stack.Push(*v)
+			vm.stack().Push(*v)
 		case OP_OBJ_TYPE_LOAD_DEFAULT:
-			objectTypeValue, err := vm.stack.Pop()
+			objectTypeValue, err := vm.stack().Pop()
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -812,7 +817,7 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			value := v.(data.RuntimeValue)
-			vm.stack.Push(value)
+			vm.stack().Push(value)
 		default:
 			return nomadError.RuntimeError(fmt.Sprintf("failed to interpret instruction [%s]", instruction.Code), instruction.DebugToken)
 		}
