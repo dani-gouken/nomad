@@ -26,7 +26,7 @@ print fib(16) // 967
 
 ```
 type Equation :: {
-    auto a :: 0.0
+    float a :: 0.0
     float b :: 0.0
     float c :: 0.0
 }

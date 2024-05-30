@@ -9,11 +9,14 @@ import (
 )
 
 func main() {
-	repl.Start()
 	if len(os.Args) < 2 {
 		panic("source file is needed")
 	}
 	sourceFile := os.Args[1]
+	if sourceFile == "repl" {
+		repl.Start()
+		return
+	}
 	bytes, err := os.ReadFile(sourceFile)
 	if err != nil {
 		panic(err)

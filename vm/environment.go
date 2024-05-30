@@ -77,7 +77,7 @@ func (s *Scope) UnsetVariable(name string) {
 func (s *Scope) GetVariable(name string) (*data.RuntimeValue, error) {
 	value, ok := s.variables[name]
 	if !ok {
-		return value, fmt.Errorf("undefined variable %s", name)
+		return value, fmt.Errorf("could not find  %s", name)
 	}
 	return value, nil
 }
