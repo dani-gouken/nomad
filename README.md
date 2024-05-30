@@ -30,6 +30,7 @@ type Equation :: {
     float b :: 0.0
     float c :: 0.0
 }
+
 auto solve_2nd :: func(Equation eq) [float] {
     auto delta ::  pow(eq.b, 2) - (4.0 * eq.a * eq.c)
     if delta < 0.0 {
@@ -49,40 +50,10 @@ auto eq :: new Equation{
 }
 print solve_2nd(eq)
 ```
-### structs
-
-```
-type Header  :: {
-    string name :: ""
-    string value :: ""
-}
-
-type HttpResponse :: {
-    int status :: 0
-    string body :: ""
-    [Header] headers :: [Header]{
-        new Header { name :: "Content-Type", value :: "application/json" }
-        new Header { name :: "Content-Lenght", value :: "0" }
-    }
-}
-
-type HttpStatus :: {
-    int OK :: 200 
-    int ValidationError :: 422 
-}
-
-HttpResponse res :: new HttpResponse{
-    status :: HttpStatus#OK
-    body :: "{\"msg\": \"Hello world\"}"
-}
-
-print res.status
-print res.body
-```
 
 ## Test it
 
-`go run main.go somefile.nd`
+`go run main.go examples/fib.nd`
 
 ## Todo
 - [x] Variables
