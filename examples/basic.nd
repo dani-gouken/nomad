@@ -1,5 +1,5 @@
 from http use { Server, Mux }
-type entrypoint = func ([string]) -> (int)
+type entrypoint = const func ([string]) -> (int)
 entrypoint main :: ([string] args) int {
     Server app = new Server{
         port :: 8000,

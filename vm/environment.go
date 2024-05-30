@@ -21,9 +21,6 @@ type Environment struct {
 	scopeCounter int
 }
 
-func (e *Environment) GetLastRetrivedVarName() {
-
-}
 func (e *Environment) PushScope() Scope {
 	nextScopeId := e.scopeCounter + 1
 	scope := Scope{
@@ -33,6 +30,7 @@ func (e *Environment) PushScope() Scope {
 	e.scopes[nextScopeId] = scope
 	return scope
 }
+
 func (e *Environment) GetCurrentScope() (*Scope, error) {
 
 	scope, ok := e.scopes[e.currentScope]
@@ -83,6 +81,7 @@ func (s *Scope) GetVariable(name string) (*data.RuntimeValue, error) {
 	}
 	return value, nil
 }
+
 func (e *Environment) DeclareVariable(
 	name string,
 	runtimeValue *data.RuntimeValue,

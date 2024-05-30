@@ -17,7 +17,6 @@ const (
 
 type Vm struct {
 	callStack     *CallStack
-	env           Environment
 	arguments     []data.RuntimeValue
 	namedArgument map[string]data.RuntimeValue
 	types         types.Registrar
@@ -72,7 +71,11 @@ func (vm *Vm) ClearArguments() {
 }
 
 func (vm *Vm) Env() *Environment {
-	return &vm.env
+	f, err := vm.callStack.Current()
+	if err != nil {
+		panic(err)
+	}
+	return f.Env()
 }
 
 type Instruction struct {
@@ -84,7 +87,6 @@ type Instruction struct {
 
 func New() *Vm {
 	return &Vm{
-		env:           NewEnvironment(),
 		types:         types.NewRegistrar(),
 		namedArgument: make(map[string]data.RuntimeValue),
 		arguments:     []data.RuntimeValue{},
@@ -326,10 +328,13 @@ loop:
 			if err != nil {
 				return err
 			}
-			vm.PushPositionalArgument(*value)
+			vm.PushPositionalArgument(data.RuntimeValue{
+				Value:       value.Value,
+				RuntimeType: value.RuntimeType,
+			})
 		case OP_FUNC_BEGIN:
 		case OP_FUNC_END:
-			vm.env.PopScope()
+			vm.Env().PopScope()
 		case OP_RETURN:
 			returnedValue, err := vm.stack().Pop()
 			if err != nil {
@@ -352,13 +357,17 @@ loop:
 				return err
 			}
 			f := value.Value.(*data.RuntimeFunc)
-			// if len(f.Signature.Parameters) < vm.ArgumentCount() {
-			// 	return nomadError.RuntimeError(fmt.Sprintf(
-			// 		"failed to call function %s :: %s, too much argument provided, %d declared, %d passed",
-			// 		f.Tag, f.Signature.AsType().GetName(), len(f.Signature.Parameters), vm.ArgumentCount()), instruction.DebugToken)
-			// }
-			// we move to the func begining
-			vm.env.PushScope()
+			if len(f.Signature.Parameters) < vm.ArgumentCount() {
+				return nomadError.RuntimeError(fmt.Sprintf(
+					"failed to call function %s :: %s, too much argument provided, %d declared, %d passed",
+					f.Tag, f.Signature.AsType().GetName(), len(f.Signature.Parameters), vm.ArgumentCount()), instruction.DebugToken)
+			}
+			currentFrame, err := vm.callStack.Current()
+			if err != nil {
+				return err
+			}
+			//we move to the func begining
+			frame := NewFrame(i, f, instruction.DebugToken, currentFrame)
 			for _, pData := range f.Signature.Parameters {
 				value, err := vm.PopNamedArgument(pData.Name)
 				if err != nil {
@@ -367,20 +376,19 @@ loop:
 						if pData.HasDefault {
 							value = pData.DefaultValue
 						} else {
-							vm.env.PopScope()
+							vm.Env().PopScope()
 							return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 						}
 					}
 				}
 				err = pData.RuntimeType.Match(value.RuntimeType)
 				if err != nil {
-					vm.env.PopScope()
 					return nomadError.RuntimeError(
 						fmt.Sprintf("failed to call %s, type mismatch for parameter \"%s\". %s", f.Tag, pData.Name, err.Error()), instruction.DebugToken)
 				}
-				vm.Env().DeclareVariable(pData.Name, &value, pData.RuntimeType)
+				frame.Env().DeclareVariable(pData.Name, &value, pData.RuntimeType)
 			}
-			vm.callStack.Push(NewFrame(i, f, instruction.DebugToken))
+			vm.callStack.Push(frame)
 			i = f.Begin - 1
 		case OP_PUSH_NAMED_ARG:
 			value, err := vm.stack().Pop()
@@ -399,7 +407,7 @@ loop:
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
 			variableName := instruction.Arg1
-			variable, err := vm.env.GetVariable(variableName)
+			variable, err := vm.Env().GetVariable(variableName)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}
@@ -487,7 +495,6 @@ loop:
 			arraySubType := t.Value.(types.RuntimeType)
 			arrayType := types.NewArrayType(arraySubType)
 			vm.stack().PushType(vm.types, arrayType)
-
 		case OP_ARR_PUSH:
 			value, err := vm.stack().Pop()
 			if err != nil {
@@ -510,6 +517,9 @@ loop:
 			array.Value = runtimeArray
 		case OP_ARR_LOAD:
 			index, err := vm.stack().Pop()
+			if err != nil {
+				return err
+			}
 			array, err := vm.stack().Pop()
 			if err != nil {
 				return err
@@ -533,7 +543,7 @@ loop:
 		case OP_POP_CONST:
 			vm.stack().Pop()
 		case OP_LOAD_VAR:
-			value, err := vm.Env().GetVariable(instruction.Arg1)
+			value, err := vm.callStack.GetVariable(instruction.Arg1)
 			if err != nil {
 				return nomadError.RuntimeError(err.Error(), instruction.DebugToken)
 			}

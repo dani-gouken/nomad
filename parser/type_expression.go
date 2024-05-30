@@ -6,12 +6,15 @@ import (
 )
 
 func (p *Parser) parseTypeExpr(allowAuto bool) (Expr, *nomadError.ParseError) {
+	return p.parseBasicTypeExpr(allowAuto)
+}
 
+func (p *Parser) parseBasicTypeExpr(allowAuto bool) (Expr, *nomadError.ParseError) {
 	t, _ := p.peek()
 
 	if t.Kind == tokenizer.TOKEN_KIND_LEFT_BRACKET {
 		return p.parseBracketExpr(func() (Expr, *nomadError.ParseError) {
-			return p.parseTypeExpr(allowAuto)
+			return p.parseBasicTypeExpr(allowAuto)
 		})
 	}
 

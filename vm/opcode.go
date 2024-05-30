@@ -19,6 +19,7 @@ const (
 	OP_NEGATIVE              = "OP_NEGATIVE"
 	OP_STORE_GLOBAL          = "STORE_GLOBAL"
 	OP_DECL_VAR              = "DECL_VAR"
+	OP_DECL_CONST            = "DECL_CONST"
 	OP_SET_VAR               = "SET_VAR"
 	OP_MULT                  = "MULT"
 	OP_EQ                    = "EQ"

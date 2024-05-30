@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"github.com/dani-gouken/nomad/compiler"
 	"github.com/dani-gouken/nomad/parser"
 	"github.com/dani-gouken/nomad/tokenizer"
 	"github.com/dani-gouken/nomad/vm"
@@ -21,7 +22,7 @@ func (p *Interpreter) Interpret(code string, instance *vm.Vm) error {
 	if err != nil {
 		return err
 	}
-	opCode, err := vm.Compile(program.Stmts)
+	opCode, err := compiler.Compile(program.Stmts)
 	//vm.DebugPrintOpCode(opCode)
 	if err != nil {
 		return err

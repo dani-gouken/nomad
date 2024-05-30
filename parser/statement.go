@@ -8,18 +8,19 @@ import (
 )
 
 const (
-	STMT_KIND_IMPLICIT_RETURN  = "IMPLICIT_RETURN"
-	STMT_KIND_VAR_DECLARATION  = "VARIABLE_DECLARATION"
-	STMT_KIND_TYPE_DECLARATION = "TYPE_DECLARATION"
-	STMT_KIND_IF               = "IF"
-	STMT_KIND_DEBUG_PRINT      = "DEBUG_PRINT"
-	STMT_KIND_ELSE             = "ELSE"
-	STMT_KIND_FOR              = "FOR"
-	STMT_KIND_ELIF             = "ELIF"
-	STMT_KIND_SCOPE            = "SCOPE"
-	STMT_KIND_ASSIGNMENT       = "ASSIGNMENT"
-	STMT_KIND_ARR_ASSIGNMENT   = "ARR_ASSIGNMENT"
-	STMT_KIND_RETURN           = "RETURN"
+	STMT_KIND_IMPLICIT_RETURN   = "IMPLICIT_RETURN"
+	STMT_KIND_VAR_DECLARATION   = "VARIABLE_DECLARATION"
+	STMT_KIND_CONST_DECLARATION = "CONST_DECLARATION"
+	STMT_KIND_TYPE_DECLARATION  = "TYPE_DECLARATION"
+	STMT_KIND_IF                = "IF"
+	STMT_KIND_DEBUG_PRINT       = "DEBUG_PRINT"
+	STMT_KIND_ELSE              = "ELSE"
+	STMT_KIND_FOR               = "FOR"
+	STMT_KIND_ELIF              = "ELIF"
+	STMT_KIND_SCOPE             = "SCOPE"
+	STMT_KIND_ASSIGNMENT        = "ASSIGNMENT"
+	STMT_KIND_ARR_ASSIGNMENT    = "ARR_ASSIGNMENT"
+	STMT_KIND_RETURN            = "RETURN"
 )
 
 func (p *Parser) parseStmts() ([]*Stmt, *nomadError.ParseError) {
@@ -70,6 +71,7 @@ func (p *Parser) parseStmt() ([]*Stmt, *nomadError.ParseError) {
 		p.parsePrint,
 		p.parseReturn,
 		p.parseTypeDeclaration,
+		p.parseConstantDeclaration,
 		p.parseVariableDeclaration,
 		p.parseIfStatement,
 		p.parseForLoop,
@@ -322,6 +324,20 @@ func (p *Parser) parseVariableDeclaration() ([]*Stmt, *nomadError.ParseError) {
 	p.terminateStmt(stmt)
 
 	return []*Stmt{&stmt}, nil
+}
+func (p *Parser) parseConstantDeclaration() ([]*Stmt, *nomadError.ParseError) {
+	err := p.expectNF(tokenizer.TOKEN_KIND_CONST, "const")
+	if err != nil {
+		return []*Stmt{}, err
+	}
+	p.consume()
+	stmts, err := p.parseVariableDeclaration()
+	if err != nil {
+		return stmts, err
+	}
+	stmt := stmts[0]
+	stmt.Kind = STMT_KIND_CONST_DECLARATION
+	return stmts, err
 }
 
 func (p *Parser) parseTypeDeclaration() ([]*Stmt, *nomadError.ParseError) {

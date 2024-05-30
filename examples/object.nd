@@ -1,22 +1,22 @@
 type Header :: {
-    name :: ""
-    value :: ""
+    string name :: ""
+    string value :: ""
 }
 
 type HttpResponse :: {
-    status :: 0
-    body :: ""
-    headers :: [Header]{}
+    int status :: 0
+    string body :: ""
+    [Header] headers :: [Header]{}
 }
 
 type HttpStatus :: {
-    OK :: 200 
-    ValidationError :: 422 
-    Unauthorized :: 401 
-    Redirect :: 301
+    int OK :: 200 
+    int ValidationError :: 422 
+    int Unauthorized :: 401 
+    int Redirect :: 301
 }
 
-var res :: new HttpResponse{
+auto res :: new HttpResponse{
     status :: HttpStatus#OK
     body :: "Hello world"
     headers :: [Header]{
@@ -30,6 +30,6 @@ print res.body
 print res.headers
 print "headers"
 
-for var i :: 0; i < len res.headers; i++ {
+for int i :: 0; i < len res.headers; i++ {
     print res.headers[i].value
 }

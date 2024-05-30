@@ -1,4 +1,4 @@
-package vm
+package compiler
 
 import (
 	"fmt"
@@ -10,16 +10,17 @@ import (
 	"github.com/dani-gouken/nomad/parser"
 	"github.com/dani-gouken/nomad/runtime/types"
 	"github.com/dani-gouken/nomad/tokenizer"
+	"github.com/dani-gouken/nomad/vm"
 )
 
 type Compiler struct {
 	stmts        []*parser.Stmt
-	instructions []Instruction
+	instructions []vm.Instruction
 	cursor       int
 }
 
-func CompileExpr(expr parser.Expr) ([]Instruction, error) {
-	instructions := []Instruction{}
+func CompileExpr(expr parser.Expr) ([]vm.Instruction, error) {
+	instructions := []vm.Instruction{}
 	switch expr.Kind {
 	case parser.EXPR_KIND_NOT:
 		compiled, err := CompileExpr(expr.Children[0])
@@ -27,8 +28,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, compiled...)
-		return append(instructions, Instruction{
-			Code:       OP_NOT,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_NOT,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_LEN:
@@ -37,8 +38,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, compiled...)
-		return append(instructions, Instruction{
-			Code:       OP_LEN,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_LEN,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_ANONYMOUS:
@@ -56,19 +57,19 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, compiled...)
-		return append(instructions, Instruction{
-			Code:       OP_NEGATIVE,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_NEGATIVE,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_CONSTANT:
 		t := expr.Token
 		switch t.Kind {
 		case tokenizer.TOKEN_KIND_TRUE:
-			return []Instruction{
+			return []vm.Instruction{
 				{
-					Code:       OP_PUSH_CONST,
+					Code:       vm.OP_PUSH_CONST,
 					Arg1:       types.BOOL_TYPE,
-					Arg2:       OP_CONST_TRUE,
+					Arg2:       vm.OP_CONST_TRUE,
 					DebugToken: expr.Token,
 				},
 			}, nil
@@ -77,9 +78,9 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			if strings.Contains(t.Content, ".") {
 				numType = types.FLOAT_TYPE
 			}
-			return []Instruction{
+			return []vm.Instruction{
 				{
-					Code:       OP_PUSH_CONST,
+					Code:       vm.OP_PUSH_CONST,
 					Arg1:       numType,
 					Arg2:       t.Content,
 					DebugToken: expr.Token,
@@ -92,20 +93,20 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			} else {
 				content = content[1 : len(content)-1]
 			}
-			return []Instruction{
+			return []vm.Instruction{
 				{
-					Code:       OP_PUSH_CONST,
+					Code:       vm.OP_PUSH_CONST,
 					Arg1:       types.STRING_TYPE,
 					Arg2:       content,
 					DebugToken: expr.Token,
 				},
 			}, nil
 		case tokenizer.TOKEN_KIND_FALSE:
-			return []Instruction{
+			return []vm.Instruction{
 				{
-					Code:       OP_PUSH_CONST,
+					Code:       vm.OP_PUSH_CONST,
 					Arg1:       types.BOOL_TYPE,
-					Arg2:       OP_CONST_FALSE,
+					Arg2:       vm.OP_CONST_FALSE,
 					DebugToken: expr.Token,
 				},
 			}, nil
@@ -116,8 +117,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_ADD,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_ADD,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_AND:
@@ -125,8 +126,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_AND,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_AND,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_OR:
@@ -134,8 +135,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_OR,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_OR,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_DIVISION:
@@ -143,8 +144,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_DIV,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_DIV,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_SUBSTRACTION:
@@ -152,8 +153,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_SUB,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_SUB,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_MULTIPLICATION:
@@ -161,8 +162,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_MULT,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_MULT,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_EQ:
@@ -170,8 +171,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		return append(instructions, Instruction{
-			Code:       OP_EQ,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_EQ,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_LESS_THAN, parser.EXPR_KIND_MORE_THAN:
@@ -183,14 +184,14 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if expr.Kind == parser.EXPR_KIND_LESS_THAN {
 			expected = "-1"
 		}
-		instructions = append(instructions, Instruction{
-			Code:       OP_PUSH_CONST,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_PUSH_CONST,
 			DebugToken: expr.Token,
 			Arg1:       types.INT_TYPE,
 			Arg2:       expected,
 		})
-		instructions = append(instructions, Instruction{
-			Code:       OP_EQ,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_EQ,
 			DebugToken: expr.Token,
 		})
 		return instructions, err
@@ -199,14 +200,14 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if expr.Kind == parser.EXPR_LESS_THAN_OR_EQ {
 			expected = "-1"
 		}
-		instructions = append(instructions, Instruction{
-			Code:       OP_PUSH_CONST,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_PUSH_CONST,
 			DebugToken: expr.Token,
 			Arg1:       types.INT_TYPE,
 			Arg2:       expected,
 		})
-		instructions = append(instructions, Instruction{
-			Code:       OP_PUSH_CONST,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_PUSH_CONST,
 			DebugToken: expr.Token,
 			Arg1:       types.INT_TYPE,
 			Arg2:       "0",
@@ -216,8 +217,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, exprInstructions...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_EQ_2,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_EQ_2,
 			DebugToken: expr.Token,
 		})
 		return instructions, err
@@ -226,41 +227,41 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		if err != nil {
 			return instructions, err
 		}
-		op := OP_ADD
+		op := vm.OP_ADD
 		if expr.Kind == parser.EXPR_KIND_RIGHT_DECREMENT {
-			op = OP_SUB
+			op = vm.OP_SUB
 		}
-		instructions = append(instructions, Instruction{
-			Code:       OP_PUSH_CONST,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_PUSH_CONST,
 			DebugToken: expr.Token,
 			Arg1:       types.INT_TYPE,
 			Arg2:       "1",
 		})
-		instructions = append(instructions, Instruction{
+		instructions = append(instructions, vm.Instruction{
 			Code:       op,
 			DebugToken: expr.Token,
 		})
-		instructions = append(instructions, Instruction{
-			Code:       OP_SET_VAR,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_SET_VAR,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
 		return instructions, err
 	case parser.EXPR_KIND_ID:
-		return append(instructions, Instruction{
-			Code:       OP_LOAD_VAR,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_LOAD_VAR,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_TYPE_AUTO:
-		return append(instructions, Instruction{
-			Code:       OP_LOAD_TYPE_INFER,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_LOAD_TYPE_INFER,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		}), nil
 	case parser.EXPR_KIND_TYPE:
-		return append(instructions, Instruction{
-			Code:       OP_LOAD_TYPE,
+		return append(instructions, vm.Instruction{
+			Code:       vm.OP_LOAD_TYPE,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		}), nil
@@ -272,8 +273,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, typeInstr...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_ARR_INIT,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_ARR_INIT,
 			DebugToken: expr.Token,
 		})
 		for i := 0; i < len(itemsExpr.Children); i++ {
@@ -282,8 +283,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 				return instructions, err
 			}
 			instructions = append(instructions, exprInstructions...)
-			instructions = append(instructions, Instruction{
-				Code:       OP_ARR_PUSH,
+			instructions = append(instructions, vm.Instruction{
+				Code:       vm.OP_ARR_PUSH,
 				DebugToken: itemsExpr.Children[i].Token,
 			})
 		}
@@ -295,8 +296,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, typeInstr...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_ARR_TYPE,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_ARR_TYPE,
 			DebugToken: expr.Token,
 		})
 		return instructions, nil
@@ -319,20 +320,20 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			instructions = append(instructions, argumentInsts...)
 
 			if argumentExpr.Kind == parser.EXPR_KIND_FUNC_NAMED_ARG {
-				instructions = append(instructions, Instruction{
-					Code:       OP_PUSH_NAMED_ARG,
+				instructions = append(instructions, vm.Instruction{
+					Code:       vm.OP_PUSH_NAMED_ARG,
 					DebugToken: argumentExpr.Token,
 					Arg1:       argumentExpr.Token.Content,
 				})
 			} else {
-				instructions = append(instructions, Instruction{
-					Code:       OP_PUSH_ARG,
+				instructions = append(instructions, vm.Instruction{
+					Code:       vm.OP_PUSH_ARG,
 					DebugToken: argumentExpr.Token,
 				})
 			}
 		}
-		instructions = append(instructions, Instruction{
-			Code:       OP_CALL,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_CALL,
 			DebugToken: expr.Token,
 		})
 		return instructions, nil
@@ -347,9 +348,9 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		return instructions, nil
 	case parser.EXPR_KIND_FUNC_PARAM:
 		hasDefault := len(expr.Children) == 2
-		opCode := OP_FUNC_SET_PARAM
+		opCode := vm.OP_FUNC_SET_PARAM
 		if hasDefault {
-			opCode = OP_FUNC_SET_PARAM_WITH_DEFAULT
+			opCode = vm.OP_FUNC_SET_PARAM_WITH_DEFAULT
 			defaultValueInstruction, err := CompileExpr(expr.Children[1])
 			if err != nil {
 				return instructions, err
@@ -365,7 +366,7 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		instructions = append(instructions, typeInstruction...)
 
-		instructions = append(instructions, Instruction{
+		instructions = append(instructions, vm.Instruction{
 			Code: opCode,
 			Arg1: expr.Token.Content,
 		})
@@ -374,8 +375,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		funcId := strconv.Itoa(rand.Int())
 		funcLabel := "__func" + "_" + funcId
 		funcDeclEndLabel := "__func" + "_" + funcId + "_decl_end"
-		instructions = append(instructions, Instruction{
-			Code:       OP_FUNC_INIT,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_FUNC_INIT,
 			Arg1:       funcLabel,
 			DebugToken: expr.Token,
 		})
@@ -388,8 +389,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, retTypeExprInsts...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_FUNC_SET_RET,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_FUNC_SET_RET,
 			DebugToken: retTypeExpr.Token,
 		})
 		parameterListExpr := expr.Children[0]
@@ -398,16 +399,16 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, parameterListExprInsts...)
-		instructions = append(instructions, Instruction{
-			Code: OP_JUMP,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_JUMP,
 			Arg1: funcDeclEndLabel,
 		})
-		instructions = append(instructions, Instruction{
-			Code: OP_LABEL,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_LABEL,
 			Arg1: funcLabel,
 		})
-		instructions = append(instructions, Instruction{
-			Code: OP_FUNC_BEGIN,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_FUNC_BEGIN,
 		})
 		funcBodyInsts, err := CompileChunk(expr.Block)
 		if err != nil {
@@ -415,17 +416,17 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 
 		instructions = append(instructions, funcBodyInsts...)
-		instructions = append(instructions, Instruction{
-			Code: OP_FUNC_END,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_FUNC_END,
 		})
-		instructions = append(instructions, Instruction{
-			Code: OP_LABEL,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_LABEL,
 			Arg1: funcDeclEndLabel,
 		})
 		return instructions, nil
 	case parser.EXPR_KIND_TYPE_FUNC:
-		instructions = append(instructions, Instruction{
-			Code:       OP_FUNC_TYPE,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_FUNC_TYPE,
 			DebugToken: expr.Token,
 		})
 		if len(expr.Children) != 2 {
@@ -440,8 +441,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 				return instructions, err
 			}
 			instructions = append(instructions, paramInsts...)
-			instructions = append(instructions, Instruction{
-				Code: OP_FUNC_TYPE_SET_PARAM,
+			instructions = append(instructions, vm.Instruction{
+				Code: vm.OP_FUNC_TYPE_SET_PARAM,
 			})
 		}
 
@@ -451,8 +452,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 
 		instructions = append(instructions, retInsts...)
-		instructions = append(instructions, Instruction{
-			Code: OP_FUNC_TYPE_SET_RET,
+		instructions = append(instructions, vm.Instruction{
+			Code: vm.OP_FUNC_TYPE_SET_RET,
 		})
 		return instructions, nil
 
@@ -464,28 +465,28 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		instructions = append(instructions, arrayInst...)
 		if expr.Token.Kind == tokenizer.TOKEN_KIND_NUM_LIT {
-			instructions = append(instructions, Instruction{
-				Code:       OP_PUSH_CONST,
+			instructions = append(instructions, vm.Instruction{
+				Code:       vm.OP_PUSH_CONST,
 				Arg1:       types.INT_TYPE,
 				Arg2:       expr.Token.Content,
 				DebugToken: expr.Token,
 			})
 		} else {
-			instructions = append(instructions, Instruction{
-				Code:       OP_LOAD_VAR,
+			instructions = append(instructions, vm.Instruction{
+				Code:       vm.OP_LOAD_VAR,
 				Arg1:       expr.Token.Content,
 				DebugToken: expr.Token,
 			})
 
 		}
-		instructions = append(instructions, Instruction{
-			Code:       OP_ARR_LOAD,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_ARR_LOAD,
 			DebugToken: expr.Token,
 		})
 		return instructions, nil
 	case parser.EXPR_KIND_TYPE_OBJ:
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_TYPE,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_TYPE,
 			DebugToken: expr.Token,
 		})
 		for _, v := range expr.Children {
@@ -497,8 +498,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 		}
 		return instructions, nil
 	case parser.EXPR_KIND_OBJ:
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_INIT,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_INIT,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
@@ -525,8 +526,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, exprs...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_TYPE_SET_FIELD,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_TYPE_SET_FIELD,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
@@ -539,8 +540,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, exprs...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_SET_FIELD,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_SET_FIELD,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
@@ -552,8 +553,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, objInst...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_LOAD,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_LOAD,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
@@ -565,8 +566,8 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 			return instructions, err
 		}
 		instructions = append(instructions, objInst...)
-		instructions = append(instructions, Instruction{
-			Code:       OP_OBJ_TYPE_LOAD_DEFAULT,
+		instructions = append(instructions, vm.Instruction{
+			Code:       vm.OP_OBJ_TYPE_LOAD_DEFAULT,
 			Arg1:       expr.Token.Content,
 			DebugToken: expr.Token,
 		})
@@ -575,19 +576,19 @@ func CompileExpr(expr parser.Expr) ([]Instruction, error) {
 	return instructions, fmt.Errorf("could not compile expression [%s]", expr.Kind)
 }
 
-func CompileComp(expr parser.Expr) ([]Instruction, error) {
+func CompileComp(expr parser.Expr) ([]vm.Instruction, error) {
 	instructions, err := CompileBinaryExpr(expr)
 	if err != nil {
 		return instructions, err
 	}
-	return append(instructions, Instruction{
-		Code:       OP_CMP,
+	return append(instructions, vm.Instruction{
+		Code:       vm.OP_CMP,
 		DebugToken: expr.Token,
 	}), nil
 }
 
-func CompileBinaryExpr(expr parser.Expr) ([]Instruction, error) {
-	instructions := []Instruction{}
+func CompileBinaryExpr(expr parser.Expr) ([]vm.Instruction, error) {
+	instructions := []vm.Instruction{}
 	compiled, err := CompileExpr(expr.Children[0])
 	if err != nil {
 		return instructions, err
@@ -643,8 +644,8 @@ func (c *Compiler) CompileStmt() error {
 			if i+1 < len(branches) {
 				nextLabel = c.label(branches[i+1].Kind, branches[i+1])
 			}
-			c.instructions = append(c.instructions, Instruction{
-				Code: OP_LABEL,
+			c.instructions = append(c.instructions, vm.Instruction{
+				Code: vm.OP_LABEL,
 				Arg1: label,
 			})
 			if branch.Kind != parser.STMT_KIND_ELSE {
@@ -653,8 +654,8 @@ func (c *Compiler) CompileStmt() error {
 					return err
 				}
 				c.instructions = append(c.instructions, ifConditionInstructions...)
-				c.instructions = append(c.instructions, Instruction{
-					Code: OP_JUMP_NOT,
+				c.instructions = append(c.instructions, vm.Instruction{
+					Code: vm.OP_JUMP_NOT,
 					Arg1: nextLabel,
 				})
 			}
@@ -663,14 +664,14 @@ func (c *Compiler) CompileStmt() error {
 				return err
 			}
 			c.instructions = append(c.instructions, branchStmts...)
-			c.instructions = append(c.instructions, Instruction{
-				Code: OP_JUMP,
+			c.instructions = append(c.instructions, vm.Instruction{
+				Code: vm.OP_JUMP,
 				Arg1: exitIfLabel,
 			})
 			label = nextLabel
 		}
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_LABEL,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_LABEL,
 			Arg1: exitIfLabel,
 		})
 		return nil
@@ -678,8 +679,8 @@ func (c *Compiler) CompileStmt() error {
 		c.consume()
 		endForLabel := c.label("END_FOR", stmt)
 		forTestLabel := c.label("FOR_TEST", stmt)
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_LABEL,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_LABEL,
 			Arg1: forTestLabel,
 		})
 		testExprInstructions, err := CompileExpr(stmt.Expr)
@@ -687,16 +688,16 @@ func (c *Compiler) CompileStmt() error {
 			return err
 		}
 		c.instructions = append(c.instructions, testExprInstructions...)
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_PUSH_CONST,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_PUSH_CONST,
 			Arg1: types.BOOL_TYPE,
-			Arg2: OP_CONST_TRUE,
+			Arg2: vm.OP_CONST_TRUE,
 		})
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_EQ,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_EQ,
 		})
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_JUMP_NOT,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_JUMP_NOT,
 			Arg1: endForLabel,
 		})
 		forOperationsInstructions, err := CompileChunk(stmt.Children)
@@ -704,12 +705,12 @@ func (c *Compiler) CompileStmt() error {
 			return err
 		}
 		c.instructions = append(c.instructions, forOperationsInstructions...)
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_JUMP,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_JUMP,
 			Arg1: forTestLabel,
 		})
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_LABEL,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_LABEL,
 			Arg1: endForLabel,
 		})
 		return err
@@ -717,13 +718,13 @@ func (c *Compiler) CompileStmt() error {
 		varName := stmt.Data[0].Content
 		compiled, err := CompileExpr(stmt.Expr)
 		c.instructions = append(c.instructions, compiled...)
-		c.instructions = append(c.instructions, Instruction{
-			Code:       OP_SET_VAR,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_SET_VAR,
 			Arg1:       varName,
 			DebugToken: stmt.Expr.Token,
 		})
-		c.instructions = append(c.instructions, Instruction{
-			Code:       OP_POP_CONST,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_POP_CONST,
 			DebugToken: stmt.Expr.Token,
 		})
 		c.consume()
@@ -731,16 +732,16 @@ func (c *Compiler) CompileStmt() error {
 	case parser.STMT_KIND_DEBUG_PRINT:
 		compiled, err := CompileExpr(stmt.Expr)
 		c.instructions = append(c.instructions, compiled...)
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_DEBUG_PRINT,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_DEBUG_PRINT,
 		})
 		c.consume()
 		return err
 	case parser.STMT_KIND_RETURN:
 		compiled, err := CompileExpr(stmt.Expr)
 		c.instructions = append(c.instructions, compiled...)
-		c.instructions = append(c.instructions, Instruction{
-			Code: OP_RETURN,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code: vm.OP_RETURN,
 		})
 		c.consume()
 		return err
@@ -751,8 +752,8 @@ func (c *Compiler) CompileStmt() error {
 			return err
 		}
 		c.instructions = append(c.instructions, compiled...)
-		c.instructions = append(c.instructions, Instruction{
-			Code:       OP_DECL_TYPE,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_DECL_TYPE,
 			Arg1:       typeName,
 			DebugToken: stmt.Expr.Token,
 		})
@@ -762,13 +763,28 @@ func (c *Compiler) CompileStmt() error {
 		varName := stmt.Data[0].Content
 		compiled, err := CompileExpr(stmt.Expr)
 		c.instructions = append(c.instructions, compiled...)
-		c.instructions = append(c.instructions, Instruction{
-			Code:       OP_DECL_VAR,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_DECL_VAR,
 			Arg2:       varName,
 			DebugToken: stmt.Expr.Token,
 		})
-		c.instructions = append(c.instructions, Instruction{
-			Code:       OP_POP_CONST,
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_POP_CONST,
+			DebugToken: stmt.Expr.Token,
+		})
+		c.consume()
+		return err
+	case parser.STMT_KIND_CONST_DECLARATION:
+		varName := stmt.Data[0].Content
+		compiled, err := CompileExpr(stmt.Expr)
+		c.instructions = append(c.instructions, compiled...)
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_DECL_CONST,
+			Arg2:       varName,
+			DebugToken: stmt.Expr.Token,
+		})
+		c.instructions = append(c.instructions, vm.Instruction{
+			Code:       vm.OP_POP_CONST,
 			DebugToken: stmt.Expr.Token,
 		})
 		c.consume()
@@ -777,10 +793,10 @@ func (c *Compiler) CompileStmt() error {
 		return fmt.Errorf("unable to compile statement [%s]", stmt.Kind)
 	}
 }
-func (c *Compiler) GetInstructions() []Instruction {
+func (c *Compiler) GetInstructions() []vm.Instruction {
 	return c.instructions
 }
-func (c *Compiler) CompileChunk(stmts []*parser.Stmt) ([]Instruction, error) {
+func (c *Compiler) CompileChunk(stmts []*parser.Stmt) ([]vm.Instruction, error) {
 	c.stmts = stmts
 	for c.peek() != nil {
 		err := c.CompileStmt()
@@ -790,24 +806,24 @@ func (c *Compiler) CompileChunk(stmts []*parser.Stmt) ([]Instruction, error) {
 	}
 	return c.GetInstructions(), nil
 }
-func RemoveLabels(instructions []Instruction) ([]Instruction, error) {
+func RemoveLabels(instructions []vm.Instruction) ([]vm.Instruction, error) {
 	labels := map[string]int{}
 	for i := 0; i < len(instructions); i++ {
 		instruction := instructions[i]
-		if instruction.Code == OP_LABEL {
+		if instruction.Code == vm.OP_LABEL {
 			labels[instruction.Arg1] = i + 1
 		}
 	}
 
 	for i := 0; i < len(instructions); i++ {
 		instruction := &instructions[i]
-		if instruction.Code == OP_JUMP || instruction.Code == OP_JUMP_NOT || instruction.Code == OP_FUNC_INIT {
+		if instruction.Code == vm.OP_JUMP || instruction.Code == vm.OP_JUMP_NOT || instruction.Code == vm.OP_FUNC_INIT {
 			instruction.Arg1 = strconv.Itoa(labels[instruction.Arg1])
 		}
 	}
 	return instructions, nil
 }
-func (c *Compiler) Compile(stmts []*parser.Stmt) ([]Instruction, error) {
+func (c *Compiler) Compile(stmts []*parser.Stmt) ([]vm.Instruction, error) {
 	instructions, err := c.CompileChunk(stmts)
 	if err != nil {
 		return instructions, err
@@ -815,11 +831,11 @@ func (c *Compiler) Compile(stmts []*parser.Stmt) ([]Instruction, error) {
 	return RemoveLabels(instructions)
 }
 
-func Compile(program []*parser.Stmt) ([]Instruction, error) {
+func Compile(program []*parser.Stmt) ([]vm.Instruction, error) {
 	compiler := Compiler{}
 	return compiler.Compile(program)
 }
-func CompileChunk(program []*parser.Stmt) ([]Instruction, error) {
+func CompileChunk(program []*parser.Stmt) ([]vm.Instruction, error) {
 	compiler := Compiler{}
 	return compiler.CompileChunk(program)
 }
@@ -845,7 +861,7 @@ func (c *Compiler) rollback(position int) {
 	c.cursor = position
 }
 
-func DebugPrintOpCode(instructions []Instruction) {
+func DebugPrintOpCode(instructions []vm.Instruction) {
 	for i := 0; i < len(instructions); i++ {
 		instruction := instructions[i]
 		fmt.Printf("%s    %s %s", instruction.Code, instruction.Arg1, instruction.Arg2)
